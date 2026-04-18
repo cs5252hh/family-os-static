@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AdventureKids 管理員儀表板</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+tailwind.config={theme:{extend:{
+  fontFamily:{sans:['"Inter"','"Noto Sans TC"','sans-serif']},
+  colors:{
+    dark:{900:'#13141C',800:'#1C1E2A',700:'#2A2D3E',600:'#3F445E'},
+    accent:{gold:'#F59E0B',green:'#10B981',blue:'#3B82F6',purple:'#8B5CF6',red:'#EF4444',indigo:'#6366F1'}
+  }
+}}}
+</script>
+<style>
+*{font-family:'Inter','Noto Sans TC',sans-serif;-webkit-tap-highlight-color:transparent;}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:#2A2D3E;border-radius:10px;}
+.fade{animation:fadeIn .3s ease forwards;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.card{background:#1C1E2A;border:1px solid #2A2D3E;border-radius:16px;}
+.stat-card{background:linear-gradient(135deg,#1C1E2A 0%,#2A2D3E 100%);border:1px solid #2A2D3E;border-radius:16px;transition:transform .2s,box-shadow .2s;}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);}
+.table-row{transition:background .15s;}
+.table-row:hover{background:rgba(42,45,62,.5);}
+.badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:9999px;font-size:12px;font-weight:500;}
+.expand-content{max-height:0;overflow:hidden;transition:max-height .3s ease;}
+.expand-content.open{max-height:500px;}
+.tab-btn{padding:8px 20px;border-radius:9999px;font-size:14px;font-weight:500;transition:all .2s;}
+.tab-btn.active{background:#3B82F6;color:#fff;}
+.tab-btn:not(.active){color:#9CA3AF;}
+.tab-btn:not(.active):hover{background:rgba(59,130,246,.15);color:#60A5FA;}
+.pulse{animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+</style>
+</head>
+<body class="bg-dark-900 text-white min-h-screen">
+
+<!-- ═══ Login Screen ═══ -->
+<div id="loginScreen" class="min-h-screen flex items-center justify-center p-4">
+  <div class="card p-8 w-full max-w-sm text-center fade">
+    <div class="text-4xl mb-3">🏝️</div>
+    <h1 class="text-xl font-bold mb-1">AdventureKids 管理員</h1>
+    <p class="text-gray-400 text-sm mb-6">僅限授權管理員登入</p>
+    <button onclick="adminLogin()" class="w-full bg-white hover:bg-gray-100 text-gray-800 rounded-lg py-3 px-4 transition-colors flex items-center justify-center space-x-3 border border-gray-300">
+      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      <span class="font-medium">使用 Google 帳號登入</span>
+    </button>
+    <p id="loginError" class="text-accent-red text-sm mt-4 hidden"></p>
+  </div>
+</div>
+
+<!-- ═══ Loading Screen ═══ -->
+<div id="loadingScreen" class="min-h-screen flex items-center justify-center hidden">
+  <div class="text-center">
+    <div class="text-4xl mb-3 pulse">🏝️</div>
+    <p class="text-gray-400 text-sm">載入管理資料中...</p>
+  </div>
+</div>
+
+<!-- ═══ Main Dashboard ═══ -->
+<div id="dashboard" class="hidden">
+  <!-- Top Bar -->
+  <header class="sticky top-0 z-50 bg-dark-900/90 backdrop-blur-md border-b border-dark-700">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <span class="text-2xl">🏝️</span>
+        <div>
+          <h1 class="font-bold text-lg leading-tight">AdventureKids 管理員</h1>
+          <p class="text-xs text-gray-500" id="adminEmail"></p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-3">
+        <button onclick="refreshAll()" class="p-2 rounded-lg hover:bg-dark-700 transition-colors" title="重新整理">
+          <i class="ph ph-arrows-clockwise text-xl text-gray-400"></i>
+        </button>
+        <button onclick="adminLogout()" class="p-2 rounded-lg hover:bg-dark-700 transition-colors" title="登出">
+          <i class="ph ph-sign-out text-xl text-gray-400"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+    <!-- ═══ Stats Overview ═══ -->
+    <section class="fade">
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">總覽</h2>
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3" id="statsGrid">
+        <!-- filled by JS -->
+      </div>
+    </section>
+
+    <!-- ═══ Tabs ═══ -->
+    <div class="flex space-x-2 overflow-x-auto pb-1">
+      <button class="tab-btn active" onclick="switchTab('users')">
+        <i class="ph ph-users mr-1"></i>用戶列表
+      </button>
+      <button class="tab-btn" onclick="switchTab('families')">
+        <i class="ph ph-house mr-1"></i>家庭列表
+      </button>
+      <button class="tab-btn" onclick="switchTab('activity')">
+        <i class="ph ph-lightning mr-1"></i>即時活動
+      </button>
+    </div>
+
+    <!-- ═══ Tab: Users ═══ -->
+    <section id="tab-users" class="fade">
+      <div class="flex flex-wrap gap-2 mb-4">
+        <select id="filterLoginType" onchange="renderUsers()" class="bg-dark-700 border border-dark-600 text-sm rounded-lg px-3 py-2 text-gray-300">
+          <option value="all">全部登入方式</option>
+          <option value="line">LINE 用戶</option>
+          <option value="google">Google 用戶</option>
+        </select>
+        <select id="filterRole" onchange="renderUsers()" class="bg-dark-700 border border-dark-600 text-sm rounded-lg px-3 py-2 text-gray-300">
+          <option value="all">全部角色</option>
+          <option value="captain">船長</option>
+          <option value="kid">小冒險家</option>
+        </select>
+      </div>
+      <div class="card overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-gray-500 text-xs uppercase tracking-wider border-b border-dark-700">
+                <th class="px-4 py-3">用戶</th>
+                <th class="px-4 py-3">角色</th>
+                <th class="px-4 py-3">登入方式</th>
+                <th class="px-4 py-3">所屬家庭</th>
+                <th class="px-4 py-3 text-right">貝殼幣</th>
+                <th class="px-4 py-3 text-right">寵物 EXP</th>
+                <th class="px-4 py-3">最後活躍</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody"></tbody>
+          </table>
+        </div>
+        <div id="usersEmpty" class="hidden text-center py-10 text-gray-500">沒有符合條件的用戶</div>
+      </div>
+    </section>
+
+    <!-- ═══ Tab: Families ═══ -->
+    <section id="tab-families" class="hidden fade">
+      <div class="space-y-3" id="familiesList"></div>
+      <div id="familiesEmpty" class="hidden text-center py-10 text-gray-500">尚無家庭資料</div>
+    </section>
+
+    <!-- ═══ Tab: Activity ═══ -->
+    <section id="tab-activity" class="hidden fade">
+      <div class="card divide-y divide-dark-700" id="activityList"></div>
+      <div id="activityEmpty" class="hidden text-center py-10 text-gray-500">尚無活動紀錄</div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+// ══════════════════════════════════════
+// Firebase Config
+// ══════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyC3JW1uql53R_fU4sqEct-5GacFr0NGVm0",
+  authDomain: "family-grow-together.firebaseapp.com",
+  projectId: "family-grow-together",
+  storageBucket: "family-grow-together.firebasestorage.app",
+  messagingSenderId: "1058037901780",
+  appId: "1:1058037901780:web:bb35f0cfa4056e9ac776e8"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+const ADMIN_EMAIL = 'cs5252hh@gmail.com';
+
+// ══════════════════════════════════════
+// State
+// ══════════════════════════════════════
+let allUsers = [];
+let allFamilies = [];
+let familySubData = {}; // { familyId: { tasks:[], rewards:[], redemptions:[] } }
+let activityFeed = [];
+let currentTab = 'users';
+
+// ══════════════════════════════════════
+// Auth
+// ══════════════════════════════════════
+async function adminLogin() {
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    const result = await auth.signInWithPopup(provider);
+    const email = result.user.email;
+    if (email !== ADMIN_EMAIL) {
+      await auth.signOut();
+      showLoginError('此帳號未授權。僅限管理員登入。');
+      return;
+    }
+    showScreen('loading');
+    await loadAllData();
+    showScreen('dashboard');
+    document.getElementById('adminEmail').textContent = email;
+  } catch (e) {
+    if (e.code === 'auth/popup-closed-by-user') return;
+    showLoginError('登入失敗：' + e.message);
+  }
+}
+
+function adminLogout() {
+  auth.signOut();
+  allUsers = []; allFamilies = []; familySubData = {}; activityFeed = [];
+  showScreen('login');
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById('loginError');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+function showScreen(name) {
+  document.getElementById('loginScreen').classList.toggle('hidden', name !== 'login');
+  document.getElementById('loadingScreen').classList.toggle('hidden', name !== 'loading');
+  document.getElementById('dashboard').classList.toggle('hidden', name !== 'dashboard');
+}
+
+// ══════════════════════════════════════
+// Data Loading
+// ══════════════════════════════════════
+async function loadAllData() {
+  // Load users and families in parallel
+  const [usersSnap, familiesSnap] = await Promise.all([
+    db.collection('users').get(),
+    db.collection('families').get()
+  ]);
+
+  allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  allFamilies = familiesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  // Load subcollections for each family in parallel
+  familySubData = {};
+  const subPromises = allFamilies.map(async (fam) => {
+    const [tasksSnap, rewardsSnap, redemptionsSnap] = await Promise.all([
+      db.collection('families').doc(fam.id).collection('tasks').get(),
+      db.collection('families').doc(fam.id).collection('rewards').get(),
+      db.collection('families').doc(fam.id).collection('redemptions').get()
+    ]);
+    familySubData[fam.id] = {
+      tasks: tasksSnap.docs.map(d => ({ id: d.id, familyId: fam.id, ...d.data() })),
+      rewards: rewardsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      redemptions: redemptionsSnap.docs.map(d => ({ id: d.id, familyId: fam.id, ...d.data() }))
+    };
+  });
+  await Promise.all(subPromises);
+
+  // Build activity feed
+  buildActivityFeed();
+
+  // Render everything
+  renderStats();
+  renderUsers();
+  renderFamilies();
+  renderActivity();
+}
+
+async function refreshAll() {
+  showScreen('loading');
+  await loadAllData();
+  showScreen('dashboard');
+}
+
+// ══════════════════════════════════════
+// Activity Feed Builder
+// ══════════════════════════════════════
+function buildActivityFeed() {
+  activityFeed = [];
+
+  // New user registrations
+  allUsers.forEach(u => {
+    if (u.createdAt) {
+      activityFeed.push({
+        type: 'register',
+        icon: '👤',
+        text: `${u.name || u.id} 註冊了帳號`,
+        detail: isGoogle(u.id) ? 'Google' : 'LINE',
+        time: toDate(u.createdAt)
+      });
+    }
+  });
+
+  // Completed tasks & submitted tasks
+  Object.values(familySubData).forEach(fd => {
+    fd.tasks.forEach(t => {
+      if (t.completedAt) {
+        activityFeed.push({
+          type: 'task_complete',
+          icon: '✅',
+          text: `任務「${t.title}」已完成`,
+          detail: `+${t.reward || 0} 貝殼幣`,
+          time: toDate(t.completedAt)
+        });
+      }
+      if (t.submittedAt) {
+        activityFeed.push({
+          type: 'task_submit',
+          icon: '📋',
+          text: `${t.assignedTo ? shortId(t.assignedTo) : '用戶'} 提交了「${t.title}」`,
+          detail: '',
+          time: toDate(t.submittedAt)
+        });
+      }
+    });
+
+    fd.redemptions.forEach(r => {
+      if (r.appliedAt) {
+        activityFeed.push({
+          type: 'redeem',
+          icon: '🎁',
+          text: `兌換申請「${r.rewardTitle || '獎勵'}」`,
+          detail: `${r.cost || 0} 貝殼幣`,
+          time: toDate(r.appliedAt)
+        });
+      }
+    });
+  });
+
+  // Sort by time descending, take latest 20
+  activityFeed.sort((a, b) => (b.time || 0) - (a.time || 0));
+  activityFeed = activityFeed.slice(0, 20);
+}
+
+// ══════════════════════════════════════
+// Render: Stats
+// ══════════════════════════════════════
+function renderStats() {
+  const totalUsers = allUsers.length;
+  const lineUsers = allUsers.filter(u => !isGoogle(u.id)).length;
+  const googleUsers = allUsers.filter(u => isGoogle(u.id)).length;
+  const totalFamilies = allFamilies.length;
+
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekStart = new Date(todayStart);
+  weekStart.setDate(weekStart.getDate() - 7);
+
+  const activeToday = allUsers.filter(u => {
+    const d = toDate(u.lastActiveAt);
+    return d && d >= todayStart;
+  }).length;
+
+  const newThisWeek = allUsers.filter(u => {
+    const d = toDate(u.createdAt);
+    return d && d >= weekStart;
+  }).length;
+
+  const stats = [
+    { label: '總用戶數', value: totalUsers, icon: 'ph-users', color: 'text-accent-blue' },
+    { label: 'LINE 用戶', value: lineUsers, icon: 'ph-chat-circle', color: 'text-accent-green' },
+    { label: 'Google 用戶', value: googleUsers, icon: 'ph-google-logo', color: 'text-accent-red' },
+    { label: '總家庭數', value: totalFamilies, icon: 'ph-house', color: 'text-accent-purple' },
+    { label: '今日活躍', value: activeToday, icon: 'ph-lightning', color: 'text-accent-gold' },
+    { label: '本週新用戶', value: newThisWeek, icon: 'ph-user-plus', color: 'text-accent-indigo' }
+  ];
+
+  document.getElementById('statsGrid').innerHTML = stats.map(s => `
+    <div class="stat-card p-4">
+      <div class="flex items-center justify-between mb-2">
+        <i class="ph ${s.icon} text-xl ${s.color}"></i>
+      </div>
+      <div class="text-2xl font-bold">${s.value}</div>
+      <div class="text-xs text-gray-500 mt-1">${s.label}</div>
+    </div>
+  `).join('');
+}
+
+// ══════════════════════════════════════
+// Render: Users Table
+// ══════════════════════════════════════
+function renderUsers() {
+  const loginFilter = document.getElementById('filterLoginType').value;
+  const roleFilter = document.getElementById('filterRole').value;
+
+  let filtered = allUsers.filter(u => {
+    if (loginFilter === 'line' && isGoogle(u.id)) return false;
+    if (loginFilter === 'google' && !isGoogle(u.id)) return false;
+    if (roleFilter !== 'all' && u.role !== roleFilter) return false;
+    return true;
+  });
+
+  // Sort by lastActiveAt desc
+  filtered.sort((a, b) => (toDate(b.lastActiveAt) || 0) - (toDate(a.lastActiveAt) || 0));
+
+  const tbody = document.getElementById('usersTableBody');
+  const empty = document.getElementById('usersEmpty');
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  // Build family name lookup
+  const familyNames = {};
+  allFamilies.forEach(f => { familyNames[f.id] = f.name || f.id; });
+
+  tbody.innerHTML = filtered.map(u => {
+    const loginType = isGoogle(u.id);
+    const loginBadge = loginType
+      ? '<span class="badge bg-red-500/20 text-red-400">Google</span>'
+      : '<span class="badge bg-green-500/20 text-green-400">LINE</span>';
+    const roleBadge = u.role === 'captain'
+      ? '<span class="badge bg-blue-500/20 text-blue-400">🚢 船長</span>'
+      : '<span class="badge bg-purple-500/20 text-purple-400">🧒 小冒險家</span>';
+    const familyName = u.familyId ? (familyNames[u.familyId] || u.familyId) : '-';
+    const lastActive = u.lastActiveAt ? formatTime(toDate(u.lastActiveAt)) : '-';
+
+    return `<tr class="table-row border-b border-dark-700/50">
+      <td class="px-4 py-3">
+        <div class="font-medium">${esc(u.name || '未命名')}</div>
+        <div class="text-xs text-gray-500 truncate max-w-[160px]">${esc(shortId(u.id))}</div>
+      </td>
+      <td class="px-4 py-3">${roleBadge}</td>
+      <td class="px-4 py-3">${loginBadge}</td>
+      <td class="px-4 py-3 text-gray-300 text-xs">${esc(familyName)}</td>
+      <td class="px-4 py-3 text-right font-mono text-accent-gold">${u.coins || 0}</td>
+      <td class="px-4 py-3 text-right font-mono text-accent-green">${u.petEXP || 0}</td>
+      <td class="px-4 py-3 text-xs text-gray-400">${lastActive}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════
+// Render: Families
+// ══════════════════════════════════════
+function renderFamilies() {
+  const container = document.getElementById('familiesList');
+  const empty = document.getElementById('familiesEmpty');
+
+  if (allFamilies.length === 0) {
+    container.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  // Build user lookup
+  const userMap = {};
+  allUsers.forEach(u => { userMap[u.id] = u; });
+
+  container.innerHTML = allFamilies.map(fam => {
+    const sub = familySubData[fam.id] || { tasks: [], rewards: [], redemptions: [] };
+    const memberCount = (fam.members || []).length;
+    const taskCount = sub.tasks.length;
+    const rewardCount = sub.rewards.length;
+    const created = fam.createdAt ? formatTime(toDate(fam.createdAt)) : '-';
+
+    const memberRows = (fam.members || []).map(mid => {
+      const u = userMap[mid];
+      if (!u) return `<div class="text-xs text-gray-500 py-1">${esc(shortId(mid))}（資料不存在）</div>`;
+      const loginBadge = isGoogle(u.id)
+        ? '<span class="badge bg-red-500/20 text-red-400 text-[10px]">Google</span>'
+        : '<span class="badge bg-green-500/20 text-green-400 text-[10px]">LINE</span>';
+      const roleBadge = u.role === 'captain' ? '🚢' : '🧒';
+      return `<div class="flex items-center justify-between py-1.5 text-sm">
+        <div class="flex items-center space-x-2">
+          <span>${roleBadge}</span>
+          <span class="text-gray-300">${esc(u.name || '未命名')}</span>
+          ${loginBadge}
+        </div>
+        <div class="flex items-center space-x-3 text-xs text-gray-500">
+          <span>🐚 ${u.coins || 0}</span>
+          <span>⭐ ${u.petEXP || 0}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div class="card overflow-hidden">
+      <div class="p-4 cursor-pointer flex items-center justify-between" onclick="toggleExpand(this)">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center space-x-2">
+            <span class="font-semibold">${esc(fam.name || '未命名家庭')}</span>
+            <span class="badge bg-dark-600 text-gray-400 text-[10px]">${esc(fam.inviteCode || '-')}</span>
+          </div>
+          <div class="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-500">
+            <span><i class="ph ph-users"></i> ${memberCount} 成員</span>
+            <span><i class="ph ph-list-checks"></i> ${taskCount} 任務</span>
+            <span><i class="ph ph-gift"></i> ${rewardCount} 獎勵</span>
+            <span><i class="ph ph-clock"></i> ${created}</span>
+          </div>
+        </div>
+        <i class="ph ph-caret-down text-gray-500 text-lg transition-transform expand-arrow"></i>
+      </div>
+      <div class="expand-content">
+        <div class="px-4 pb-4 pt-1 border-t border-dark-700">
+          <div class="text-xs text-gray-500 mb-2 font-semibold">成員詳情</div>
+          ${memberRows || '<div class="text-xs text-gray-500">無成員</div>'}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleExpand(el) {
+  const content = el.nextElementSibling;
+  const arrow = el.querySelector('.expand-arrow');
+  content.classList.toggle('open');
+  arrow.style.transform = content.classList.contains('open') ? 'rotate(180deg)' : '';
+}
+
+// ══════════════════════════════════════
+// Render: Activity Feed
+// ══════════════════════════════════════
+function renderActivity() {
+  const container = document.getElementById('activityList');
+  const empty = document.getElementById('activityEmpty');
+
+  if (activityFeed.length === 0) {
+    container.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  container.innerHTML = activityFeed.map(a => {
+    const timeStr = a.time ? formatTime(a.time) : '-';
+    return `<div class="flex items-center space-x-3 px-4 py-3">
+      <span class="text-xl flex-shrink-0">${a.icon}</span>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm text-gray-200">${esc(a.text)}</div>
+        ${a.detail ? `<div class="text-xs text-gray-500">${esc(a.detail)}</div>` : ''}
+      </div>
+      <div class="text-xs text-gray-600 flex-shrink-0">${timeStr}</div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════
+// Tab Switching
+// ══════════════════════════════════════
+function switchTab(tab) {
+  currentTab = tab;
+  ['users', 'families', 'activity'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
+  });
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    const isActive = btn.textContent.includes(
+      tab === 'users' ? '用戶' : tab === 'families' ? '家庭' : '即時'
+    );
+    btn.classList.toggle('active', isActive);
+  });
+}
+
+// ══════════════════════════════════════
+// Helpers
+// ══════════════════════════════════════
+function isGoogle(id) { return id && id.startsWith('google_'); }
+
+function shortId(id) {
+  if (!id) return '';
+  if (id.startsWith('google_')) return 'G:' + id.slice(7, 15) + '...';
+  if (id.length > 16) return id.slice(0, 12) + '...';
+  return id;
+}
+
+function toDate(ts) {
+  if (!ts) return null;
+  if (ts.toDate) return ts.toDate();
+  if (ts.seconds) return new Date(ts.seconds * 1000);
+  if (ts instanceof Date) return ts;
+  return new Date(ts);
+}
+
+function formatTime(d) {
+  if (!d || isNaN(d)) return '-';
+  const now = new Date();
+  const diff = now - d;
+  if (diff < 60000) return '剛剛';
+  if (diff < 3600000) return Math.floor(diff / 60000) + ' 分鐘前';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小時前';
+  if (diff < 604800000) return Math.floor(diff / 86400000) + ' 天前';
+  return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ══════════════════════════════════════
+// Init: check if already logged in
+// ══════════════════════════════════════
+auth.onAuthStateChanged(async (user) => {
+  if (user && user.email === ADMIN_EMAIL) {
+    showScreen('loading');
+    await loadAllData();
+    document.getElementById('adminEmail').textContent = user.email;
+    showScreen('dashboard');
+  } else if (user) {
+    await auth.signOut();
+    showScreen('login');
+  }
+});
+</script>
+</body>
+</html>
