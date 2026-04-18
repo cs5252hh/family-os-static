@@ -62,7 +62,7 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
 <div id="setupScreen" class="fixed inset-0 bg-dark-900 z-40 hidden">
   <div class="max-w-md mx-auto px-4 py-8 h-full flex flex-col justify-center">
     <div id="welcomeStep" class="text-center mb-8">
-      <div class="text-6xl mb-4">🏴‍☠️</div>
+      <img src="island-logo.png" alt="AdventureKids" style="width:80px;height:80px;" class="mb-4 mx-auto">
       <h1 class="text-2xl font-bold mb-2">歡迎來到 AdventureKids!</h1>
       <p class="text-gray-400 mb-6">讓我們開始建立你的家庭冒險島</p>
       <div class="card p-6 mb-6">
@@ -105,9 +105,7 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
   <aside id="desktopSidebar" class="hidden md:flex fixed left-0 top-0 h-full w-60 border-r border-dark-700 bg-dark-900 flex-col justify-between p-5 z-20">
     <div>
       <div class="flex items-center gap-3 mb-8">
-        <div class="w-9 h-9 rounded-xl bg-accent-blue flex items-center justify-center blue-glow">
-          <i class="ph-fill ph-anchor text-white text-xl"></i>
-        </div>
+        <img src="island-logo.png" alt="AdventureKids" style="width:32px;height:32px;" class="rounded-xl">
         <div>
           <h1 class="text-base font-bold text-white leading-tight">AdventureKids</h1>
           <p id="sidebarFamilyName" class="text-[10px] text-gray-600 tracking-widest uppercase">ADVENTUREKIDS</p>
@@ -302,7 +300,7 @@ async function initLiff(){
 function showDemoModeOption(){
   document.getElementById('loadingScreen').innerHTML = `
     <div class="text-center px-6">
-      <div class="text-6xl mb-4">🏴‍☠️</div>
+      <img src="island-logo.png" alt="AdventureKids" style="width:80px;height:80px;" class="mb-4 mx-auto">
       <h1 class="text-2xl font-bold mb-2">AdventureKids 冒險島</h1>
       <p class="text-gray-400 mb-8">選擇登入方式</p>
       <div class="max-w-sm mx-auto space-y-3 mb-6">
