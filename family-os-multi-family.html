@@ -32,8 +32,8 @@
     <script src="https://static.line-scdn.net/liff/edge/2.1/liff.js"></script>
     
     <!-- Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-compat-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-compat-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     
     <style>
         * {
@@ -393,6 +393,11 @@
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
 
+        // Check if running inside LINE or external browser
+        function isInLineBrowser() {
+            return /Line/i.test(navigator.userAgent);
+        }
+
         // Initialize LIFF
         async function initLiff() {
             try {
@@ -400,8 +405,13 @@
                 await liff.init({ liffId: '2009808286-3qfR7gLt' });
                 
                 if (!liff.isLoggedIn()) {
-                    updateLoadingText('請登入 LINE...');
-                    liff.login();
+                    // In LINE browser, auto-login
+                    if (liff.isInClient()) {
+                        liff.login();
+                        return;
+                    }
+                    // In external browser, show demo mode
+                    showDemoModeOption();
                     return;
                 }
 
@@ -412,7 +422,79 @@
                 await checkUserSetup();
             } catch (error) {
                 console.error('LIFF 初始化失敗:', error);
-                updateLoadingText('初始化失敗，請重新整理');
+                // LIFF failed, offer demo mode
+                showDemoModeOption();
+            }
+        }
+
+        // Show demo mode selection (for development/testing)
+        function showDemoModeOption() {
+            document.getElementById('loadingScreen').innerHTML = `
+                <div class="text-center px-6">
+                    <div class="text-6xl mb-4">🏴‍☠️</div>
+                    <h1 class="text-2xl font-bold mb-2">AdventureKids 冒險島</h1>
+                    <p class="text-gray-400 mb-8">選擇登入方式</p>
+                    
+                    <div class="max-w-sm mx-auto space-y-3 mb-6">
+                        <button onclick="loginWithLine()" class="w-full bg-green-600 hover:bg-green-700 rounded-lg py-3 px-4 transition-colors flex items-center justify-center space-x-2">
+                            <span class="text-lg">💬 LINE 登入</span>
+                        </button>
+                        
+                        <div class="flex items-center my-4">
+                            <div class="flex-1 border-t border-dark-border"></div>
+                            <span class="px-4 text-gray-500 text-sm">或使用開發模式</span>
+                            <div class="flex-1 border-t border-dark-border"></div>
+                        </div>
+                        
+                        <button onclick="enterDemoMode('captain')" class="w-full bg-blue-600 hover:bg-blue-700 rounded-lg py-3 px-4 transition-colors">
+                            <span class="text-lg">👨‍✈️ 船長模式 (Demo)</span>
+                        </button>
+                        <button onclick="enterDemoMode('kid')" class="w-full bg-purple-600 hover:bg-purple-700 rounded-lg py-3 px-4 transition-colors">
+                            <span class="text-lg">🧒 小冒險家模式 (Demo)</span>
+                        </button>
+                    </div>
+                    
+                    <p class="text-xs text-gray-500">開發模式使用 demo-family 資料</p>
+                </div>
+            `;
+        }
+
+        // LINE login redirect
+        function loginWithLine() {
+            if (typeof liff !== 'undefined' && liff.isReady) {
+                liff.login();
+            } else {
+                alert('LINE 登入暫時無法使用，請使用開發模式或從 LINE App 開啟');
+            }
+        }
+
+        // Enter demo mode
+        async function enterDemoMode(role) {
+            try {
+                if (role === 'captain') {
+                    liffUserId = 'demo-captain';
+                } else {
+                    liffUserId = 'demo-kid1';
+                }
+                
+                updateLoadingText = function(text) {
+                    // Loading screen replaced, use console
+                    console.log(text);
+                };
+                
+                // Restore loading screen briefly
+                document.getElementById('loadingScreen').innerHTML = `
+                    <div class="text-center">
+                        <div class="loading-spinner mx-auto mb-4"></div>
+                        <p class="text-lg font-medium">🌊 載入 ${role === 'captain' ? '船長' : '小冒險家'} 模式...</p>
+                        <p class="text-sm text-gray-400 mt-2">正在連接資料庫...</p>
+                    </div>
+                `;
+                
+                await checkUserSetup();
+            } catch (error) {
+                console.error('Demo 模式失敗:', error);
+                alert('載入失敗: ' + error.message);
             }
         }
 
