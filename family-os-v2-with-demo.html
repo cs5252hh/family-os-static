@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>AdventureKids 冒險島 | Family OS v2</title>
+<title>AdventureKids 冒險島</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/@phosphor-icons/web"></script>
 <script src="https://static.line-scdn.net/liff/edge/2.1/liff.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
 tailwind.config={theme:{extend:{
@@ -108,7 +109,7 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
           <i class="ph-fill ph-anchor text-white text-xl"></i>
         </div>
         <div>
-          <h1 class="text-base font-bold text-white leading-tight">Family OS</h1>
+          <h1 class="text-base font-bold text-white leading-tight">AdventureKids</h1>
           <p id="sidebarFamilyName" class="text-[10px] text-gray-600 tracking-widest uppercase">ADVENTUREKIDS</p>
         </div>
       </div>
@@ -308,6 +309,10 @@ function showDemoModeOption(){
         <button onclick="loginWithLine()" class="w-full bg-green-600 hover:bg-green-700 rounded-lg py-3 px-4 transition-colors flex items-center justify-center space-x-2">
           <span class="text-lg">💬 LINE 登入</span>
         </button>
+        <button onclick="loginWithGoogle()" class="w-full bg-white hover:bg-gray-100 text-gray-800 rounded-lg py-3 px-4 transition-colors flex items-center justify-center space-x-3 border border-gray-300">
+          <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#4285F4" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#34A853" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 000 24c0 3.77.9 7.35 2.56 10.53l7.97-5.94z"/><path fill="#EA4335" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.94C6.51 42.62 14.62 48 24 48z"/></svg>
+          <span class="font-medium">使用 Google 帳號登入</span>
+        </button>
         <div class="flex items-center my-4">
           <div class="flex-1 border-t border-dark-700"></div>
           <span class="px-4 text-gray-500 text-sm">或使用開發模式</span>
@@ -323,6 +328,32 @@ function showDemoModeOption(){
 function loginWithLine(){
   if(typeof liff !== 'undefined' && liff.isReady) liff.login();
   else alert('LINE 登入暫時無法使用，請使用開發模式或從 LINE App 開啟');
+}
+
+async function loginWithGoogle(){
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    const result = await firebase.auth().signInWithPopup(provider);
+    liffUserId = 'google_' + result.user.uid;
+
+    // Restore loading screen
+    document.getElementById('loadingScreen').innerHTML = `
+      <div class="text-center">
+        <div class="loading-spinner mx-auto mb-4"></div>
+        <p class="text-lg font-medium">🌊 AdventureKids 啟動中...</p>
+        <p id="loadingText" class="text-sm text-gray-400 mt-2">Google 登入成功，載入資料中...</p>
+      </div>`;
+
+    await checkUserSetup();
+  } catch(e){
+    console.error('Google 登入失敗:', e);
+    if(e.code === 'auth/popup-closed-by-user') return;
+    if(e.code === 'auth/unauthorized-domain'){
+      alert('此網域尚未加入 Firebase Auth 授權清單。\\n請到 Firebase Console → Authentication → Settings → Authorized domains 新增此網域。');
+    } else {
+      alert('Google 登入失敗: ' + e.message);
+    }
+  }
 }
 
 async function enterDemoMode(role){
@@ -560,7 +591,7 @@ function renderPage(){
 
   if(userRole === 'captain'){
     const titles = {home:'首頁總覽 ⚓', tasks:'任務管理 📋', rewards:'獎勵中心 🎁', reminders:'貼心提醒 🔔'};
-    ht.textContent = titles[currentPage] || 'Family OS';
+    ht.textContent = titles[currentPage] || 'AdventureKids 冒險島';
     hr.innerHTML = '';
     el.innerHTML = currentPage==='home' ? captainHome()
                  : currentPage==='tasks' ? captainTasks()
