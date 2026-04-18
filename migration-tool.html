@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family OS - 資料遷移工具</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #13141C;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #1C1E2A;
+            border-radius: 12px;
+            padding: 30px;
+        }
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            background: #2A2D3E;
+            border-radius: 8px;
+        }
+        .log {
+            background: #13141C;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            height: 200px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        button {
+            background: #3B82F6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563EB;
+        }
+        button:disabled {
+            background: #6B7280;
+            cursor: not-allowed;
+        }
+        .success { color: #10B981; }
+        .error { color: #EF4444; }
+        .warning { color: #F59E0B; }
+        .info { color: #3B82F6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Family OS 資料遷移工具</h1>
+        <p>將現有的單一家庭資料遷移到新的多家庭架構</p>
+
+        <div class="step">
+            <h3>Step 1: Firebase 連接</h3>
+            <button onclick="initFirebase()">初始化 Firebase</button>
+            <span id="firebaseStatus">待連接</span>
+        </div>
+
+        <div class="step">
+            <h3>Step 2: 檢查現有資料</h3>
+            <button onclick="checkExistingData()" disabled id="checkBtn">檢查資料</button>
+            <div id="dataStatus">等待檢查...</div>
+        </div>
+
+        <div class="step">
+            <h3>Step 3: 建立新架構</h3>
+            <button onclick="createNewStructure()" disabled id="createBtn">建立架構</button>
+            <div id="structureStatus">等待建立...</div>
+        </div>
+
+        <div class="step">
+            <h3>Step 4: 遷移資料</h3>
+            <button onclick="migrateData()" disabled id="migrateBtn">開始遷移</button>
+            <div id="migrateStatus">等待遷移...</div>
+        </div>
+
+        <div class="step">
+            <h3>Step 5: 驗證結果</h3>
+            <button onclick="verifyMigration()" disabled id="verifyBtn">驗證資料</button>
+            <div id="verifyStatus">等待驗證...</div>
+        </div>
+
+        <div class="log" id="logOutput">
+            === 遷移日誌 ===
+        </div>
+
+        <div class="step">
+            <h3>🔧 緊急選項</h3>
+            <button onclick="rollback()" style="background: #EF4444;">回滾資料</button>
+            <button onclick="clearNewStructure()" style="background: #F59E0B;">清除新架構</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-compat-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-compat-firestore.js"></script>
+
+    <script>
+        let db;
+        let migrationData = {};
+        
+        const DEMO_FAMILY_ID = 'demo-family';
+        const DEMO_CAPTAIN_ID = 'demo-captain';
+        const DEMO_KID_ID = 'demo-kid1';
+
+        // Firebase 設定
+        const firebaseConfig = {
+            apiKey: "AIzaSyDkv3rBMgWBnvPF0rjSuunPsY1C2H4QrWo",
+            authDomain: "family-grow-together.firebaseapp.com",
+            projectId: "family-grow-together",
+            storageBucket: "family-grow-together.firebasestorage.app",
+            messagingSenderId: "1058037901780",
+            appId: "1:1058037901780:web:bb35f0cfa4056e9ac776e8"
+        };
+
+        // 初始化 Firebase
+        function initFirebase() {
+            try {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                
+                log('✅ Firebase 初始化成功', 'success');
+                document.getElementById('firebaseStatus').textContent = '已連接';
+                document.getElementById('firebaseStatus').className = 'success';
+                document.getElementById('checkBtn').disabled = false;
+                
+            } catch (error) {
+                log(`❌ Firebase 初始化失敗: ${error.message}`, 'error');
+                document.getElementById('firebaseStatus').textContent = '連接失敗';
+                document.getElementById('firebaseStatus').className = 'error';
+            }
+        }
+
+        // 檢查現有資料
+        async function checkExistingData() {
+            try {
+                log('🔍 開始檢查現有資料...', 'info');
+                
+                // 檢查舊架構資料
+                const collections = ['tasks', 'rewards', 'redemptions', 'reminders'];
+                migrationData = {};
+                
+                for (const collectionName of collections) {
+                    const snapshot = await db.collection(collectionName).get();
+                    migrationData[collectionName] = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        data: doc.data()
+                    }));
+                    log(`📊 發現 ${snapshot.size} 個 ${collectionName} 文檔`, 'info');
+                }
+
+                // 檢查是否已有新架構
+                const familyDoc = await db.collection('families').doc(DEMO_FAMILY_ID).get();
+                const userDocs = await Promise.all([
+                    db.collection('users').doc(DEMO_CAPTAIN_ID).get(),
+                    db.collection('users').doc(DEMO_KID_ID).get()
+                ]);
+
+                if (familyDoc.exists || userDocs.some(doc => doc.exists)) {
+                    log('⚠️ 警告：檢測到新架構已存在！', 'warning');
+                    document.getElementById('dataStatus').innerHTML = '⚠️ 新架構已存在，請先清除或使用不同ID';
+                } else {
+                    log('✅ 資料檢查完成，可以開始建立架構', 'success');
+                    document.getElementById('dataStatus').innerHTML = '✅ 檢查完成，資料正常';
+                    document.getElementById('createBtn').disabled = false;
+                }
+                
+            } catch (error) {
+                log(`❌ 資料檢查失敗: ${error.message}`, 'error');
+                document.getElementById('dataStatus').innerHTML = '❌ 檢查失敗';
+            }
+        }
+
+        // 建立新架構
+        async function createNewStructure() {
+            try {
+                log('🏗️ 開始建立新架構...', 'info');
+                
+                // 1. 建立 demo family
+                const familyData = {
+                    name: "Demo 冒險島",
+                    inviteCode: "DEMO01", 
+                    members: [DEMO_CAPTAIN_ID, DEMO_KID_ID],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    settings: {
+                        defaultTaskReward: 5,
+                        petEXPPerTask: 5,
+                        timezone: "Asia/Taipei"
+                    },
+                    stats: {
+                        totalTasksCompleted: 0,
+                        totalCoinsEarned: 0,
+                        activeDays: 0
+                    }
+                };
+                
+                await db.collection('families').doc(DEMO_FAMILY_ID).set(familyData);
+                log('✅ Demo 家庭建立完成', 'success');
+
+                // 2. 建立 demo captain user
+                const captainData = {
+                    familyId: DEMO_FAMILY_ID,
+                    role: "captain",
+                    name: "船長",
+                    coins: 100,
+                    petEXP: 25,
+                    streak: 3,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastActiveAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                await db.collection('users').doc(DEMO_CAPTAIN_ID).set(captainData);
+                log('✅ Demo 船長用戶建立完成', 'success');
+
+                // 3. 建立 demo kid user  
+                const kidData = {
+                    familyId: DEMO_FAMILY_ID,
+                    role: "kid",
+                    name: "小冒險家",
+                    coins: 50,
+                    petEXP: 15,
+                    streak: 2,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastActiveAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                await db.collection('users').doc(DEMO_KID_ID).set(kidData);
+                log('✅ Demo 小冒險家用戶建立完成', 'success');
+
+                // 4. 建立初始提醒
+                const reminderData = {
+                    emoji: "👋",
+                    message: "歡迎來到全新的 AdventureKids 多家庭版本！",
+                    isActive: true,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdBy: DEMO_CAPTAIN_ID
+                };
+                
+                await db.collection('families').doc(DEMO_FAMILY_ID).collection('reminders').add(reminderData);
+                log('✅ 初始提醒建立完成', 'success');
+
+                document.getElementById('structureStatus').innerHTML = '✅ 新架構建立完成';
+                document.getElementById('migrateBtn').disabled = false;
+                
+            } catch (error) {
+                log(`❌ 建立架構失敗: ${error.message}`, 'error');
+                document.getElementById('structureStatus').innerHTML = '❌ 建立失敗';
+            }
+        }
+
+        // 遷移資料
+        async function migrateData() {
+            try {
+                log('📦 開始遷移資料...', 'info');
+                const batch = db.batch();
+                let batchCount = 0;
+
+                // 遷移任務
+                if (migrationData.tasks) {
+                    for (const task of migrationData.tasks) {
+                        const taskRef = db.collection('families').doc(DEMO_FAMILY_ID).collection('tasks').doc(task.id);
+                        const taskData = {
+                            ...task.data,
+                            // 更新欄位名稱以符合新架構
+                            assignedTo: task.data.assignedTo || DEMO_KID_ID,
+                            assignedBy: task.data.assignedBy || DEMO_CAPTAIN_ID
+                        };
+                        batch.set(taskRef, taskData);
+                        batchCount++;
+                    }
+                    log(`📋 準備遷移 ${migrationData.tasks.length} 個任務`, 'info');
+                }
+
+                // 遷移獎勵
+                if (migrationData.rewards) {
+                    for (const reward of migrationData.rewards) {
+                        const rewardRef = db.collection('families').doc(DEMO_FAMILY_ID).collection('rewards').doc(reward.id);
+                        const rewardData = {
+                            ...reward.data,
+                            createdBy: DEMO_CAPTAIN_ID
+                        };
+                        batch.set(rewardRef, rewardData);
+                        batchCount++;
+                    }
+                    log(`🎁 準備遷移 ${migrationData.rewards.length} 個獎勵`, 'info');
+                }
+
+                // 遷移兌換記錄
+                if (migrationData.redemptions) {
+                    for (const redemption of migrationData.redemptions) {
+                        const redemptionRef = db.collection('families').doc(DEMO_FAMILY_ID).collection('redemptions').doc(redemption.id);
+                        const redemptionData = {
+                            ...redemption.data,
+                            userId: redemption.data.userId || DEMO_KID_ID,
+                            reviewedBy: redemption.data.reviewedBy || DEMO_CAPTAIN_ID
+                        };
+                        batch.set(redemptionRef, redemptionData);
+                        batchCount++;
+                    }
+                    log(`💰 準備遷移 ${migrationData.redemptions.length} 個兌換記錄`, 'info');
+                }
+
+                // 遷移提醒（跳過，因為已經有初始提醒）
+                if (migrationData.reminders && migrationData.reminders.length > 1) {
+                    for (let i = 1; i < migrationData.reminders.length; i++) {
+                        const reminder = migrationData.reminders[i];
+                        const reminderRef = db.collection('families').doc(DEMO_FAMILY_ID).collection('reminders').doc();
+                        const reminderData = {
+                            ...reminder.data,
+                            createdBy: DEMO_CAPTAIN_ID
+                        };
+                        batch.set(reminderRef, reminderData);
+                        batchCount++;
+                    }
+                    log(`💬 準備遷移 ${migrationData.reminders.length - 1} 個提醒`, 'info');
+                }
+
+                // 執行批次寫入
+                if (batchCount > 0) {
+                    await batch.commit();
+                    log(`✅ 成功遷移 ${batchCount} 個文檔`, 'success');
+                } else {
+                    log('ℹ️ 沒有資料需要遷移', 'info');
+                }
+
+                document.getElementById('migrateStatus').innerHTML = '✅ 資料遷移完成';
+                document.getElementById('verifyBtn').disabled = false;
+                
+            } catch (error) {
+                log(`❌ 資料遷移失敗: ${error.message}`, 'error');
+                document.getElementById('migrateStatus').innerHTML = '❌ 遷移失敗';
+            }
+        }
+
+        // 驗證遷移結果
+        async function verifyMigration() {
+            try {
+                log('🔍 開始驗證遷移結果...', 'info');
+                
+                // 驗證家庭資料
+                const familyDoc = await db.collection('families').doc(DEMO_FAMILY_ID).get();
+                if (familyDoc.exists) {
+                    log('✅ 家庭資料正常', 'success');
+                } else {
+                    log('❌ 家庭資料遺失', 'error');
+                }
+
+                // 驗證用戶資料
+                const userDocs = await Promise.all([
+                    db.collection('users').doc(DEMO_CAPTAIN_ID).get(),
+                    db.collection('users').doc(DEMO_KID_ID).get()
+                ]);
+                
+                if (userDocs.every(doc => doc.exists)) {
+                    log('✅ 用戶資料正常', 'success');
+                } else {
+                    log('❌ 部分用戶資料遺失', 'error');
+                }
+
+                // 驗證子集合
+                const collections = ['tasks', 'rewards', 'redemptions', 'reminders'];
+                for (const collectionName of collections) {
+                    const snapshot = await db.collection('families').doc(DEMO_FAMILY_ID)
+                        .collection(collectionName).get();
+                    log(`📊 ${collectionName}: ${snapshot.size} 個文檔`, 'info');
+                }
+
+                log('🎉 驗證完成！新架構已準備就緒', 'success');
+                document.getElementById('verifyStatus').innerHTML = '✅ 驗證完成';
+                
+            } catch (error) {
+                log(`❌ 驗證失敗: ${error.message}`, 'error');
+                document.getElementById('verifyStatus').innerHTML = '❌ 驗證失敗';
+            }
+        }
+
+        // 回滾資料
+        async function rollback() {
+            if (!confirm('確定要回滾資料嗎？這將刪除新架構的所有資料！')) {
+                return;
+            }
+
+            try {
+                log('⏪ 開始回滾資料...', 'warning');
+                
+                // 刪除新架構
+                await clearNewStructure();
+                
+                log('✅ 回滾完成', 'success');
+                
+            } catch (error) {
+                log(`❌ 回滾失敗: ${error.message}`, 'error');
+            }
+        }
+
+        // 清除新架構
+        async function clearNewStructure() {
+            try {
+                log('🗑️ 清除新架構資料...', 'warning');
+                
+                const batch = db.batch();
+
+                // 刪除家庭文檔
+                const familyRef = db.collection('families').doc(DEMO_FAMILY_ID);
+                batch.delete(familyRef);
+
+                // 刪除用戶文檔
+                const captainRef = db.collection('users').doc(DEMO_CAPTAIN_ID);
+                const kidRef = db.collection('users').doc(DEMO_KID_ID);
+                batch.delete(captainRef);
+                batch.delete(kidRef);
+
+                await batch.commit();
+
+                // 刪除子集合（需要單獨處理）
+                const collections = ['tasks', 'rewards', 'redemptions', 'reminders'];
+                for (const collectionName of collections) {
+                    const snapshot = await db.collection('families').doc(DEMO_FAMILY_ID)
+                        .collection(collectionName).get();
+                    
+                    const deleteBatch = db.batch();
+                    snapshot.docs.forEach(doc => {
+                        deleteBatch.delete(doc.ref);
+                    });
+                    
+                    if (!snapshot.empty) {
+                        await deleteBatch.commit();
+                        log(`🗑️ 清除了 ${snapshot.size} 個 ${collectionName}`, 'warning');
+                    }
+                }
+
+                log('✅ 新架構清除完成', 'success');
+                
+                // 重置按鈕狀態
+                document.getElementById('checkBtn').disabled = false;
+                document.getElementById('createBtn').disabled = true;
+                document.getElementById('migrateBtn').disabled = true;
+                document.getElementById('verifyBtn').disabled = true;
+                
+                document.getElementById('dataStatus').innerHTML = '等待檢查...';
+                document.getElementById('structureStatus').innerHTML = '等待建立...';
+                document.getElementById('migrateStatus').innerHTML = '等待遷移...';
+                document.getElementById('verifyStatus').innerHTML = '等待驗證...';
+                
+            } catch (error) {
+                log(`❌ 清除失敗: ${error.message}`, 'error');
+            }
+        }
+
+        // 日誌功能
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('logOutput');
+            const colors = {
+                success: '#10B981',
+                error: '#EF4444', 
+                warning: '#F59E0B',
+                info: '#3B82F6'
+            };
+            
+            logElement.innerHTML += `<div style="color: ${colors[type]}">[${timestamp}] ${message}</div>`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+    </script>
+</body>
+</html>

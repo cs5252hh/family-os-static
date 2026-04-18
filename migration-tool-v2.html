@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family OS - 資料遷移工具 v2</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #13141C;
+            color: white;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 { font-size: 24px; margin-bottom: 8px; }
+        .subtitle { color: #9CA3AF; margin-bottom: 24px; }
+        .step {
+            margin: 16px 0;
+            padding: 20px;
+            background: #1C1E2A;
+            border-radius: 12px;
+            border: 1px solid #2A2D3E;
+        }
+        .step h3 { margin-bottom: 12px; }
+        .step-status {
+            display: inline-block;
+            margin-left: 12px;
+            font-size: 14px;
+        }
+        .log {
+            background: #0D0E14;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'SF Mono', 'Menlo', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 16px 0;
+            border: 1px solid #2A2D3E;
+        }
+        button {
+            background: #3B82F6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        button:hover { background: #2563EB; }
+        button:disabled { background: #4B5563; cursor: not-allowed; }
+        .btn-danger { background: #EF4444; }
+        .btn-danger:hover { background: #DC2626; }
+        .btn-warning { background: #F59E0B; }
+        .btn-warning:hover { background: #D97706; }
+        .success { color: #10B981; }
+        .error { color: #EF4444; }
+        .warning { color: #F59E0B; }
+        .info { color: #60A5FA; }
+        .debug { color: #9CA3AF; }
+        .sdk-check {
+            background: #0D0E14;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin: 12px 0;
+            font-size: 13px;
+        }
+        .sdk-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .dot-green { background: #10B981; }
+        .dot-red { background: #EF4444; }
+        .dot-gray { background: #6B7280; }
+        .emergency {
+            margin-top: 16px;
+            padding: 16px;
+            background: #1C1E2A;
+            border-radius: 12px;
+            border: 1px solid #2A2D3E;
+        }
+        .emergency h3 { margin-bottom: 12px; }
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Family OS 資料遷移工具 v2</h1>
+        <p class="subtitle">將現有的單一家庭資料遷移到新的多家庭架構</p>
+
+        <!-- SDK Status Check -->
+        <div class="step">
+            <h3>🔌 SDK 載入狀態</h3>
+            <div class="sdk-check" id="sdkStatus">
+                <div class="sdk-item">
+                    <span class="dot dot-gray" id="sdkFirebaseApp"></span>
+                    <span>Firebase App SDK</span>
+                </div>
+                <div class="sdk-item">
+                    <span class="dot dot-gray" id="sdkFirestore"></span>
+                    <span>Firestore SDK</span>
+                </div>
+            </div>
+            <button onclick="checkSDK()">🔍 檢查 SDK</button>
+        </div>
+
+        <!-- Step 1 -->
+        <div class="step">
+            <h3>Step 1: Firebase 連接</h3>
+            <button onclick="initFirebase()" id="initBtn">初始化 Firebase</button>
+            <span class="step-status" id="firebaseStatus">待連接</span>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="step">
+            <h3>Step 2: 檢查現有資料</h3>
+            <button onclick="checkExistingData()" disabled id="checkBtn">檢查資料</button>
+            <span class="step-status" id="dataStatus">等待檢查...</span>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="step">
+            <h3>Step 3: 建立新架構</h3>
+            <button onclick="createNewStructure()" disabled id="createBtn">建立架構</button>
+            <span class="step-status" id="structureStatus">等待建立...</span>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="step">
+            <h3>Step 4: 遷移資料</h3>
+            <button onclick="migrateData()" disabled id="migrateBtn">開始遷移</button>
+            <span class="step-status" id="migrateStatus">等待遷移...</span>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="step">
+            <h3>Step 5: 驗證結果</h3>
+            <button onclick="verifyMigration()" disabled id="verifyBtn">驗證資料</button>
+            <span class="step-status" id="verifyStatus">等待驗證...</span>
+        </div>
+
+        <!-- Log -->
+        <div class="log" id="logOutput">=== 遷移日誌 ===</div>
+
+        <!-- Emergency -->
+        <div class="emergency">
+            <h3>🔧 緊急選項</h3>
+            <div class="btn-group">
+                <button onclick="rollback()" class="btn-danger">回滾資料</button>
+                <button onclick="clearNewStructure()" class="btn-warning">清除新架構</button>
+                <button onclick="clearLog()">清除日誌</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK - 使用多個備用來源 -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        let db = null;
+        let migrationData = {};
+        let firebaseInitialized = false;
+        
+        const DEMO_FAMILY_ID = 'demo-family';
+        const DEMO_CAPTAIN_ID = 'demo-captain';
+        const DEMO_KID_ID = 'demo-kid1';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDkv3rBMgWBnvPF0rjSuunPsY1C2H4QrWo",
+            authDomain: "family-grow-together.firebaseapp.com",
+            projectId: "family-grow-together",
+            storageBucket: "family-grow-together.firebasestorage.app",
+            messagingSenderId: "1058037901780",
+            appId: "1:1058037901780:web:bb35f0cfa4056e9ac776e8"
+        };
+
+        // 頁面載入時自動檢查 SDK
+        window.addEventListener('load', function() {
+            log('📄 頁面載入完成', 'info');
+            setTimeout(checkSDK, 500);
+        });
+
+        // 檢查 SDK 載入狀態
+        function checkSDK() {
+            log('🔍 檢查 SDK 載入狀態...', 'info');
+            
+            const appDot = document.getElementById('sdkFirebaseApp');
+            const firestoreDot = document.getElementById('sdkFirestore');
+            
+            // 檢查 Firebase App
+            if (typeof firebase !== 'undefined') {
+                appDot.className = 'dot dot-green';
+                log('  ✅ Firebase App SDK 已載入', 'success');
+            } else {
+                appDot.className = 'dot dot-red';
+                log('  ❌ Firebase App SDK 未載入', 'error');
+                log('  💡 可能是網路問題，請檢查是否能連上 gstatic.com', 'warning');
+                return;
+            }
+            
+            // 檢查 Firestore
+            if (typeof firebase !== 'undefined' && typeof firebase.firestore === 'function') {
+                firestoreDot.className = 'dot dot-green';
+                log('  ✅ Firestore SDK 已載入', 'success');
+            } else {
+                firestoreDot.className = 'dot dot-red';
+                log('  ❌ Firestore SDK 未載入', 'error');
+                return;
+            }
+            
+            log('🎉 所有 SDK 已就緒，可以開始初始化 Firebase', 'success');
+        }
+
+        // 初始化 Firebase
+        function initFirebase() {
+            log('🔗 開始初始化 Firebase...', 'info');
+            
+            // 先檢查 SDK
+            if (typeof firebase === 'undefined') {
+                log('❌ Firebase SDK 未載入！請重新整理頁面', 'error');
+                document.getElementById('firebaseStatus').textContent = 'SDK 未載入';
+                document.getElementById('firebaseStatus').className = 'step-status error';
+                return;
+            }
+            
+            if (typeof firebase.firestore !== 'function') {
+                log('❌ Firestore SDK 未載入！請重新整理頁面', 'error');
+                document.getElementById('firebaseStatus').textContent = 'Firestore 未載入';
+                document.getElementById('firebaseStatus').className = 'step-status error';
+                return;
+            }
+
+            try {
+                // 避免重複初始化
+                if (!firebaseInitialized) {
+                    try {
+                        firebase.initializeApp(firebaseConfig);
+                    } catch (e) {
+                        // 可能已經初始化過了
+                        if (e.code === 'app/duplicate-app') {
+                            log('⚠️ Firebase 已經初始化過，使用現有連接', 'warning');
+                        } else {
+                            throw e;
+                        }
+                    }
+                    firebaseInitialized = true;
+                }
+                
+                db = firebase.firestore();
+                
+                log('✅ Firebase 初始化成功', 'success');
+                log(`📊 專案: ${firebaseConfig.projectId}`, 'debug');
+                
+                document.getElementById('firebaseStatus').textContent = '✅ 已連接';
+                document.getElementById('firebaseStatus').className = 'step-status success';
+                document.getElementById('checkBtn').disabled = false;
+
+                // 快速連接測試
+                testConnection();
+                
+            } catch (error) {
+                log(`❌ Firebase 初始化失敗: ${error.message}`, 'error');
+                log(`📋 錯誤代碼: ${error.code || 'N/A'}`, 'debug');
+                log(`📋 完整錯誤: ${JSON.stringify(error)}`, 'debug');
+                document.getElementById('firebaseStatus').textContent = '❌ 連接失敗';
+                document.getElementById('firebaseStatus').className = 'step-status error';
+            }
+        }
+
+        // 測試連接
+        async function testConnection() {
+            try {
+                log('🔗 測試 Firestore 連接...', 'info');
+                const testDoc = await db.collection('_connection_test').doc('test').get();
+                log('✅ Firestore 連接正常（可以讀寫）', 'success');
+            } catch (error) {
+                if (error.code === 'permission-denied') {
+                    log('⚠️ Firestore 連接正常，但權限受限（這是正常的）', 'warning');
+                    log('💡 遷移操作應該仍可進行', 'info');
+                } else if (error.code === 'not-found') {
+                    log('✅ Firestore 連接正常', 'success');
+                } else {
+                    log(`⚠️ 連接測試: ${error.message}`, 'warning');
+                }
+            }
+        }
+
+        // 檢查現有資料
+        async function checkExistingData() {
+            try {
+                log('🔍 開始檢查現有資料...', 'info');
+                
+                const collections = ['tasks', 'rewards', 'redemptions', 'reminders'];
+                migrationData = {};
+                let totalDocs = 0;
+                
+                for (const name of collections) {
+                    try {
+                        const snapshot = await db.collection(name).get();
+                        migrationData[name] = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            data: doc.data()
+                        }));
+                        log(`📊 ${name}: ${snapshot.size} 個文檔`, 'info');
+                        totalDocs += snapshot.size;
+                    } catch (err) {
+                        log(`⚠️ ${name}: 無法讀取 (${err.message})`, 'warning');
+                        migrationData[name] = [];
+                    }
+                }
+
+                log(`📊 總共找到 ${totalDocs} 個文檔`, 'info');
+
+                // 檢查新架構是否已存在
+                try {
+                    const familyDoc = await db.collection('families').doc(DEMO_FAMILY_ID).get();
+                    if (familyDoc.exists) {
+                        log('⚠️ 新架構中已存在 demo-family！', 'warning');
+                        log('💡 如果要重新遷移，請先使用「清除新架構」', 'warning');
+                        document.getElementById('dataStatus').innerHTML = '⚠️ 新架構已存在';
+                        document.getElementById('dataStatus').className = 'step-status warning';
+                        document.getElementById('createBtn').disabled = false;
+                        return;
+                    }
+                } catch (err) {
+                    // 不存在是正常的
+                }
+
+                log('✅ 資料檢查完成，可以開始建立架構', 'success');
+                document.getElementById('dataStatus').innerHTML = '✅ 檢查完成';
+                document.getElementById('dataStatus').className = 'step-status success';
+                document.getElementById('createBtn').disabled = false;
+                
+            } catch (error) {
+                log(`❌ 資料檢查失敗: ${error.message}`, 'error');
+                document.getElementById('dataStatus').innerHTML = '❌ 檢查失敗';
+                document.getElementById('dataStatus').className = 'step-status error';
+            }
+        }
+
+        // 建立新架構
+        async function createNewStructure() {
+            try {
+                log('🏗️ 開始建立新架構...', 'info');
+                
+                // 1. 家庭
+                await db.collection('families').doc(DEMO_FAMILY_ID).set({
+                    name: "Demo 冒險島",
+                    inviteCode: "DEMO01",
+                    members: [DEMO_CAPTAIN_ID, DEMO_KID_ID],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    settings: {
+                        defaultTaskReward: 5,
+                        petEXPPerTask: 5,
+                        timezone: "Asia/Taipei"
+                    }
+                });
+                log('✅ Demo 家庭建立完成 (inviteCode: DEMO01)', 'success');
+
+                // 2. 船長
+                await db.collection('users').doc(DEMO_CAPTAIN_ID).set({
+                    familyId: DEMO_FAMILY_ID,
+                    role: "captain",
+                    name: "船長",
+                    coins: 0,
+                    petEXP: 0,
+                    streak: 0,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastActiveAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                log('✅ Demo 船長用戶建立完成', 'success');
+
+                // 3. 小冒險家
+                await db.collection('users').doc(DEMO_KID_ID).set({
+                    familyId: DEMO_FAMILY_ID,
+                    role: "kid",
+                    name: "小冒險家",
+                    coins: 0,
+                    petEXP: 0,
+                    streak: 0,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastActiveAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                log('✅ Demo 小冒險家用戶建立完成', 'success');
+
+                // 4. 初始提醒
+                await db.collection('families').doc(DEMO_FAMILY_ID)
+                    .collection('reminders').add({
+                        emoji: "👋",
+                        message: "歡迎來到全新的多家庭版 AdventureKids！",
+                        isActive: true,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        createdBy: DEMO_CAPTAIN_ID
+                    });
+                log('✅ 初始提醒建立完成', 'success');
+
+                document.getElementById('structureStatus').innerHTML = '✅ 架構建立完成';
+                document.getElementById('structureStatus').className = 'step-status success';
+                document.getElementById('migrateBtn').disabled = false;
+                
+            } catch (error) {
+                log(`❌ 建立架構失敗: ${error.message}`, 'error');
+                document.getElementById('structureStatus').innerHTML = '❌ 建立失敗';
+                document.getElementById('structureStatus').className = 'step-status error';
+            }
+        }
+
+        // 遷移資料
+        async function migrateData() {
+            try {
+                log('📦 開始遷移資料...', 'info');
+                let totalMigrated = 0;
+
+                // 遷移每個 collection
+                const collections = ['tasks', 'rewards', 'redemptions', 'reminders'];
+                
+                for (const name of collections) {
+                    const items = migrationData[name] || [];
+                    if (items.length === 0) {
+                        log(`⏭️ ${name}: 無資料，跳過`, 'debug');
+                        continue;
+                    }
+
+                    log(`📋 遷移 ${items.length} 個 ${name}...`, 'info');
+
+                    // Firestore batch 最多 500 筆
+                    const batchSize = 400;
+                    for (let i = 0; i < items.length; i += batchSize) {
+                        const batch = db.batch();
+                        const chunk = items.slice(i, i + batchSize);
+                        
+                        for (const item of chunk) {
+                            const ref = db.collection('families')
+                                .doc(DEMO_FAMILY_ID)
+                                .collection(name)
+                                .doc(item.id);
+                            
+                            const data = { ...item.data };
+                            
+                            // 補充缺少的欄位
+                            if (name === 'tasks') {
+                                if (!data.assignedTo) data.assignedTo = DEMO_KID_ID;
+                                if (!data.assignedBy) data.assignedBy = DEMO_CAPTAIN_ID;
+                            }
+                            if (name === 'rewards' && !data.createdBy) {
+                                data.createdBy = DEMO_CAPTAIN_ID;
+                            }
+                            if (name === 'redemptions') {
+                                if (!data.userId) data.userId = DEMO_KID_ID;
+                                if (!data.reviewedBy) data.reviewedBy = DEMO_CAPTAIN_ID;
+                            }
+                            if (name === 'reminders' && !data.createdBy) {
+                                data.createdBy = DEMO_CAPTAIN_ID;
+                            }
+                            
+                            batch.set(ref, data);
+                            totalMigrated++;
+                        }
+                        
+                        await batch.commit();
+                    }
+                    
+                    log(`  ✅ ${name}: ${items.length} 個文檔遷移完成`, 'success');
+                }
+
+                if (totalMigrated === 0) {
+                    log('ℹ️ 沒有資料需要遷移（舊 collection 為空）', 'info');
+                    log('💡 這是正常的，新架構已經建立好了', 'info');
+                } else {
+                    log(`✅ 成功遷移 ${totalMigrated} 個文檔`, 'success');
+                }
+
+                document.getElementById('migrateStatus').innerHTML = '✅ 遷移完成';
+                document.getElementById('migrateStatus').className = 'step-status success';
+                document.getElementById('verifyBtn').disabled = false;
+                
+            } catch (error) {
+                log(`❌ 資料遷移失敗: ${error.message}`, 'error');
+                document.getElementById('migrateStatus').innerHTML = '❌ 遷移失敗';
+                document.getElementById('migrateStatus').className = 'step-status error';
+            }
+        }
+
+        // 驗證遷移結果
+        async function verifyMigration() {
+            try {
+                log('🔍 開始驗證遷移結果...', 'info');
+                let allGood = true;
+                
+                // 驗證家庭
+                const familyDoc = await db.collection('families').doc(DEMO_FAMILY_ID).get();
+                if (familyDoc.exists) {
+                    const data = familyDoc.data();
+                    log(`✅ 家庭: ${data.name} (邀請碼: ${data.inviteCode})`, 'success');
+                } else {
+                    log('❌ 家庭資料遺失', 'error');
+                    allGood = false;
+                }
+
+                // 驗證用戶
+                for (const uid of [DEMO_CAPTAIN_ID, DEMO_KID_ID]) {
+                    const userDoc = await db.collection('users').doc(uid).get();
+                    if (userDoc.exists) {
+                        const data = userDoc.data();
+                        log(`✅ 用戶 ${uid}: ${data.name} (${data.role})`, 'success');
+                    } else {
+                        log(`❌ 用戶 ${uid} 資料遺失`, 'error');
+                        allGood = false;
+                    }
+                }
+
+                // 驗證子集合
+                const collections = ['tasks', 'rewards', 'redemptions', 'reminders'];
+                for (const name of collections) {
+                    const snapshot = await db.collection('families')
+                        .doc(DEMO_FAMILY_ID)
+                        .collection(name).get();
+                    log(`📊 families/${DEMO_FAMILY_ID}/${name}: ${snapshot.size} 個文檔`, 'info');
+                }
+
+                if (allGood) {
+                    log('', 'info');
+                    log('🎉 ==============================', 'success');
+                    log('🎉  驗證完成！新架構已準備就緒', 'success');
+                    log('🎉 ==============================', 'success');
+                    log('', 'info');
+                    log('📋 下一步：', 'info');
+                    log('  1. 部署新版本 family-os-multi-family.html', 'info');
+                    log('  2. 測試多家庭登入流程', 'info');
+                    log('  3. 邀請朋友家庭用邀請碼 DEMO01 加入測試', 'info');
+                }
+
+                document.getElementById('verifyStatus').innerHTML = allGood ? '✅ 驗證通過' : '⚠️ 部分失敗';
+                document.getElementById('verifyStatus').className = allGood ? 'step-status success' : 'step-status warning';
+                
+            } catch (error) {
+                log(`❌ 驗證失敗: ${error.message}`, 'error');
+                document.getElementById('verifyStatus').innerHTML = '❌ 驗證失敗';
+                document.getElementById('verifyStatus').className = 'step-status error';
+            }
+        }
+
+        // 回滾
+        async function rollback() {
+            if (!confirm('確定要回滾嗎？這會刪除新架構的所有資料！')) return;
+            await clearNewStructure();
+        }
+
+        // 清除新架構
+        async function clearNewStructure() {
+            try {
+                log('🗑️ 清除新架構資料...', 'warning');
+                
+                // 刪除子集合
+                const collections = ['tasks', 'rewards', 'redemptions', 'reminders'];
+                for (const name of collections) {
+                    const snapshot = await db.collection('families')
+                        .doc(DEMO_FAMILY_ID)
+                        .collection(name).get();
+                    
+                    if (!snapshot.empty) {
+                        const batch = db.batch();
+                        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+                        await batch.commit();
+                        log(`  🗑️ 清除了 ${snapshot.size} 個 ${name}`, 'warning');
+                    }
+                }
+
+                // 刪除主文檔
+                await db.collection('families').doc(DEMO_FAMILY_ID).delete();
+                await db.collection('users').doc(DEMO_CAPTAIN_ID).delete();
+                await db.collection('users').doc(DEMO_KID_ID).delete();
+
+                log('✅ 新架構清除完成', 'success');
+                
+                // 重置 UI
+                document.getElementById('createBtn').disabled = true;
+                document.getElementById('migrateBtn').disabled = true;
+                document.getElementById('verifyBtn').disabled = true;
+                document.getElementById('dataStatus').innerHTML = '等待檢查...';
+                document.getElementById('structureStatus').innerHTML = '等待建立...';
+                document.getElementById('migrateStatus').innerHTML = '等待遷移...';
+                document.getElementById('verifyStatus').innerHTML = '等待驗證...';
+                
+            } catch (error) {
+                log(`❌ 清除失敗: ${error.message}`, 'error');
+            }
+        }
+
+        // 日誌
+        function log(message, type = 'info') {
+            const ts = new Date().toLocaleTimeString();
+            const el = document.getElementById('logOutput');
+            const colors = {
+                success: '#10B981',
+                error: '#EF4444',
+                warning: '#F59E0B',
+                info: '#60A5FA',
+                debug: '#9CA3AF'
+            };
+            el.innerHTML += `<div style="color:${colors[type] || '#fff'}">[${ts}] ${message}</div>`;
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('logOutput').innerHTML = '=== 遷移日誌 ===';
+        }
+    </script>
+</body>
+</html>
