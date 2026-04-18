@@ -317,7 +317,8 @@ function showDemoModeOption(){
           <div class="flex-1 border-t border-dark-700"></div>
         </div>
         <button onclick="enterDemoMode('captain')" class="w-full bg-blue-600 hover:bg-blue-700 rounded-lg py-3 px-4 transition-colors text-lg">👨‍✈️ 船長模式 (Demo)</button>
-        <button onclick="enterDemoMode('kid')" class="w-full bg-purple-600 hover:bg-purple-700 rounded-lg py-3 px-4 transition-colors text-lg">🧒 小冒險家模式 (Demo)</button>
+        <button onclick="enterDemoMode('kid')" class="w-full bg-purple-600 hover:bg-purple-700 rounded-lg py-3 px-4 transition-colors text-lg">🧒 小明模式 (Demo)</button>
+        <button onclick="enterDemoMode('kid2')" class="w-full bg-pink-600 hover:bg-pink-700 rounded-lg py-3 px-4 transition-colors text-lg">👧 小美模式 (Demo)</button>
       </div>
       <p class="text-xs text-gray-500">開發模式使用 demo-family 資料</p>
     </div>`;
@@ -355,11 +356,11 @@ async function loginWithGoogle(){
 }
 
 async function enterDemoMode(role){
-  liffUserId = role === 'captain' ? 'demo-captain' : 'demo-kid1';
+  liffUserId = role === 'captain' ? 'demo-captain' : role === 'kid2' ? 'demo-kid2' : 'demo-kid1';
   document.getElementById('loadingScreen').innerHTML = `
     <div class="text-center">
       <div class="loading-spinner mx-auto mb-4"></div>
-      <p class="text-lg font-medium">🌊 載入${role === 'captain' ? '船長' : '小冒險家'}模式...</p>
+      <p class="text-lg font-medium">🌊 載入${role === 'captain' ? '船長' : role === 'kid2' ? '小美' : '小明'}模式...</p>
       <p id="loadingText" class="text-sm text-gray-400 mt-2">正在連接資料庫...</p>
     </div>`;
   await checkUserSetup();
@@ -774,23 +775,24 @@ function captainTasks(){
       <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">新增任務</p>
       <div class="space-y-3">
         <input id="nTitle" type="text" placeholder="任務名稱…" class="w-full border rounded-xl px-4 py-3 text-sm">
+        <div>
+          <p class="text-xs text-gray-400 mb-2">指派給（可多選）</p>
+          <div id="nKidSelect" class="flex flex-wrap gap-2">
+            ${kids.map(k => `<button type="button" onclick="toggleKidSelect(this,'${k.id}')" data-kid="${k.id}" class="kid-chip border border-dark-600 rounded-lg px-3 py-2 text-sm transition-all hover:border-accent-blue/50">${k.name}</button>`).join('')}
+            ${kids.length===0?'<span class="text-xs text-gray-500">尚無小冒險家</span>':''}
+          </div>
+        </div>
         <div class="grid grid-cols-2 gap-2">
-          <select id="nChild" class="border rounded-xl px-3 py-3 text-sm">
-            ${kids.map(k => `<option value="${k.id}">${k.name}</option>`).join('')}
-            ${kids.length===0?'<option value="">尚無小冒險家</option>':''}
-          </select>
           <select id="nCat" class="border rounded-xl px-3 py-3 text-sm">
             <option value="學習">學習</option><option value="家事">家事</option>
             <option value="才藝">才藝</option><option value="運動">運動</option>
             <option value="其他">其他</option>
           </select>
+          <input id="nPts" type="number" value="20" placeholder="貝殼幣" class="border rounded-xl px-3 py-3 text-sm text-center">
         </div>
-        <div class="flex gap-2">
-          <input id="nPts" type="number" value="20" placeholder="貝殼幣" class="flex-1 border rounded-xl px-3 py-3 text-sm text-center">
-          <button onclick="vibrate(10);addTask()" class="bg-accent-blue text-white px-5 py-3 rounded-xl text-sm font-bold transition-all active:scale-90 hover:brightness-110 flex items-center gap-1">
-            <i class="ph-fill ph-plus"></i> 新增
-          </button>
-        </div>
+        <button onclick="vibrate(10);addTask()" class="w-full bg-accent-blue text-white px-5 py-3 rounded-xl text-sm font-bold transition-all active:scale-90 hover:brightness-110 flex items-center justify-center gap-1">
+          <i class="ph-fill ph-plus"></i> 新增任務
+        </button>
       </div>
     </div>
 
@@ -1203,21 +1205,43 @@ function kidHistory(){
 // ══════════════════════════════════════
 // Actions
 // ══════════════════════════════════════
+function toggleKidSelect(btn, kidId){
+  btn.classList.toggle('selected');
+  btn.classList.toggle('bg-accent-blue/20');
+  btn.classList.toggle('border-accent-blue');
+  btn.classList.toggle('text-accent-blue');
+  vibrate(5);
+}
+
 async function addTask(){
   const title = document.getElementById('nTitle')?.value.trim();
-  const assignedTo = document.getElementById('nChild')?.value;
   const category = document.getElementById('nCat')?.value;
   const reward = parseInt(document.getElementById('nPts')?.value) || 10;
   if(!title){ showToast('請輸入任務名稱','gold'); return; }
-  if(!assignedTo){ showToast('請選擇小冒險家','gold'); return; }
+
+  const selectedKids = [...document.querySelectorAll('#nKidSelect .kid-chip.selected')].map(b => b.dataset.kid);
+  if(selectedKids.length === 0){ showToast('請選擇至少一位小冒險家','gold'); return; }
+
   try {
-    await db.collection('families').doc(userFamily.id).collection('tasks').add({
-      title, category, reward, assignedTo, assignedBy: liffUserId,
-      status: 'pending', petEXP: userFamily.settings?.petEXPPerTask || 5,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    const batch = db.batch();
+    const tasksRef = db.collection('families').doc(userFamily.id).collection('tasks');
+    selectedKids.forEach(kidId => {
+      const newRef = tasksRef.doc();
+      batch.set(newRef, {
+        title, category, reward, assignedTo: kidId, assignedBy: liffUserId,
+        status: 'pending', petEXP: userFamily.settings?.petEXPPerTask || 5,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
     });
+    await batch.commit();
     document.getElementById('nTitle').value = '';
-    showToast('<i class="ph-fill ph-plus-circle mr-1"></i> 任務已新增！','blue');
+    document.querySelectorAll('#nKidSelect .kid-chip.selected').forEach(b => {
+      b.classList.remove('selected','bg-accent-blue/20','border-accent-blue','text-accent-blue');
+    });
+    const msg = selectedKids.length > 1
+      ? `已為 ${selectedKids.length} 位小冒險家新增任務！`
+      : '任務已新增！';
+    showToast('<i class="ph-fill ph-plus-circle mr-1"></i> ' + msg, 'blue');
   } catch(e){ console.error('新增任務失敗:', e); showToast('新增失敗','red'); }
 }
 

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>初始化 demo-kid2</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<style>body{font-family:sans-serif;max-width:600px;margin:40px auto;padding:20px;background:#13141C;color:#fff;}
+button{background:#3B82F6;color:#fff;border:none;padding:12px 24px;border-radius:8px;font-size:16px;cursor:pointer;margin:10px 0;}
+button:hover{background:#2563EB;}
+.log{background:#1C1E2A;border:1px solid #2A2D3E;border-radius:8px;padding:16px;margin-top:16px;white-space:pre-wrap;font-family:monospace;font-size:13px;}
+.ok{color:#10B981;}.err{color:#EF4444;}</style>
+</head>
+<body>
+<h1>初始化 demo-kid2（小美）</h1>
+<p>點擊按鈕在 Firestore 中新增 demo-kid2 用戶並更新 demo-family 的成員陣列。</p>
+<button onclick="run()">執行初始化</button>
+<div class="log" id="log">等待執行...</div>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyC3JW1uql53R_fU4sqEct-5GacFr0NGVm0",
+  authDomain: "family-grow-together.firebaseapp.com",
+  projectId: "family-grow-together",
+  storageBucket: "family-grow-together.firebasestorage.app",
+  messagingSenderId: "1058037901780",
+  appId: "1:1058037901780:web:bb35f0cfa4056e9ac776e8"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+function log(msg, cls='') {
+  document.getElementById('log').innerHTML += `<span class="${cls}">${msg}</span>\n`;
+}
+
+async function run() {
+  document.getElementById('log').innerHTML = '';
+  try {
+    log('Step 1: 建立 users/demo-kid2 文檔...');
+    await db.collection('users').doc('demo-kid2').set({
+      familyId: 'demo-family',
+      role: 'kid',
+      name: '小美',
+      coins: 0,
+      petEXP: 0,
+      streak: 0,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      lastActiveAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    log('  ✓ demo-kid2 用戶建立成功', 'ok');
+
+    log('Step 2: 更新 families/demo-family 的 members 陣列...');
+    await db.collection('families').doc('demo-family').update({
+      members: firebase.firestore.FieldValue.arrayUnion('demo-kid2'),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    log('  ✓ demo-family members 已加入 demo-kid2', 'ok');
+
+    log('Step 3: 驗證...');
+    const userDoc = await db.collection('users').doc('demo-kid2').get();
+    const famDoc = await db.collection('families').doc('demo-family').get();
+    log(`  用戶: ${JSON.stringify(userDoc.data(), null, 2)}`, 'ok');
+    log(`  家庭成員: ${JSON.stringify(famDoc.data().members)}`, 'ok');
+
+    log('\n🎉 全部完成！demo-kid2（小美）已成功加入 demo-family。', 'ok');
+  } catch(e) {
+    log('❌ 錯誤: ' + e.message, 'err');
+    console.error(e);
+  }
+}
+</script>
+</body>
+</html>
