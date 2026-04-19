@@ -126,6 +126,7 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
           <p id="sidebarFamilyName" class="text-[10px] text-gray-600 tracking-widest uppercase">ADVENTUREKIDS</p>
         </div>
       </div>
+      <div id="sideIdentity" class="mb-4 p-3 rounded-xl border border-dark-600"></div>
       <nav id="sideNav" class="space-y-1"></nav>
       <!-- Invite Code -->
       <div class="mt-6 p-3 card">
@@ -136,9 +137,9 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
         <div id="sidebarInviteCode" class="font-mono text-sm font-bold tracking-widest text-center text-white">------</div>
       </div>
     </div>
-    <div onclick="vibrate([5,30,5]);logout()" class="p-3 card cursor-pointer hover:border-accent-red transition-all flex items-center gap-3 group card-press">
+    <div id="sideLogout" onclick="vibrate([5,30,5]);showLogoutConfirm()" class="p-3 card cursor-pointer hover:border-accent-red transition-all flex items-center gap-3 group card-press">
       <i class="ph ph-sign-out text-gray-500 group-hover:text-red-400 text-lg"></i>
-      <span class="text-sm text-gray-500 group-hover:text-red-400">登出</span>
+      <span id="sideLogoutText" class="text-sm text-gray-500 group-hover:text-red-400">登出</span>
     </div>
   </aside>
 
@@ -147,8 +148,12 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
     <div class="max-w-2xl mx-auto px-4 pt-5 pb-4 md:px-8 md:pt-8 relative z-10">
       <header class="flex justify-between items-center mb-6">
         <div>
-          <p id="hDate" class="text-[11px] text-gray-500 font-medium mb-1 tracking-widest uppercase"></p>
+          <div class="flex items-center gap-2 mb-1">
+            <p id="hDate" class="text-[11px] text-gray-500 font-medium tracking-widest uppercase"></p>
+            <span id="hRoleBadge" class="hidden text-[10px] font-bold px-2.5 py-0.5 rounded-full"></span>
+          </div>
           <h2 id="hTitle" class="text-xl font-bold text-white tracking-tight">Hello</h2>
+          <p id="hSubtitle" class="text-[11px] text-gray-500 mt-0.5 hidden"></p>
         </div>
         <div id="hRight" class="flex items-center gap-2"></div>
       </header>
@@ -987,7 +992,25 @@ async function loadHistoryPage(reset = false){
 // ══════════════════════════════════════
 function buildNav(){
   const ns = userRole === 'captain' ? NAV_CAPTAIN : NAV_KID;
-  const ac = userRole === 'captain' ? 'text-accent-blue' : 'text-accent-purple';
+  const isCap = userRole === 'captain';
+  const ac = isCap ? 'text-accent-blue' : 'text-accent-gold';
+
+  // Identity card
+  const idEl = document.getElementById('sideIdentity');
+  if(idEl){
+    const name = currentUser?.name || (isCap ? '船長' : '冒險家');
+    if(isCap){
+      idEl.className = 'mb-4 p-3 rounded-xl border border-accent-blue/20 bg-accent-blue/5';
+      idEl.innerHTML = `<div class="flex items-center gap-2.5"><span class="text-xl">👨‍✈️</span><div><p class="text-xs font-bold text-accent-blue">船長後台</p><p class="text-[10px] text-gray-400">${name}</p></div></div>`;
+    } else {
+      idEl.className = 'mb-4 p-3 rounded-xl border border-accent-gold/20 bg-accent-gold/5';
+      idEl.innerHTML = `<div class="flex items-center gap-2.5"><span class="text-xl">${currentUser?.avatar||'🧒'}</span><div><p class="text-xs font-bold text-accent-gold">小冒險家</p><p class="text-[10px] text-gray-400">${name}</p></div></div>`;
+    }
+  }
+
+  // Logout text
+  const logTxt = document.getElementById('sideLogoutText');
+  if(logTxt) logTxt.textContent = isCap ? '👨‍✈️ 登出船長後台' : '🧒 登出冒險家';
 
   document.getElementById('sideNav').innerHTML = ns.map(n => `
     <button onclick="vibrate(5);switchPage('${n.id}')" id="side-${n.id}"
@@ -1067,12 +1090,12 @@ function applyReminderTemplate(emoji, msg){
 
 function updateNavActive(){
   const ns = userRole === 'captain' ? NAV_CAPTAIN : NAV_KID;
-  const ac = userRole === 'captain' ? 'text-accent-blue' : 'text-accent-purple';
+  const ac = userRole === 'captain' ? 'text-accent-blue' : 'text-accent-gold';
   ns.forEach(n => {
     ['side-','bot-'].forEach(p => {
       const el = document.getElementById(p+n.id);
       if(!el) return;
-      el.classList.remove('text-accent-blue','text-accent-purple','text-gray-400','text-gray-500');
+      el.classList.remove('text-accent-blue','text-accent-purple','text-accent-gold','text-gray-400','text-gray-500');
       if(n.id===currentPage) el.classList.add(ac);
       else el.classList.add(p==='side-'?'text-gray-400':'text-gray-500');
     });
@@ -1086,12 +1109,17 @@ function renderPage(){
   const el = document.getElementById('viewEl');
   const ht = document.getElementById('hTitle');
   const hr = document.getElementById('hRight');
+  const hSub = document.getElementById('hSubtitle');
+  const hBadge = document.getElementById('hRoleBadge');
   if(!el) return;
 
   if(userRole === 'captain'){
     const titles = {home:'首頁總覽 ⚓', tasks:'任務管理 📋', rewards:'獎勵中心 🎁', reminders:'貼心提醒 🔔', kids:'冒險家管理 👥'};
+    const subs = {home:'船長總覽', tasks:'管理全家任務', rewards:'審核與管理獎勵', reminders:'設定貼心提醒', kids:'管理家中的小冒險家'};
     ht.textContent = titles[currentPage] || 'AdventureKids 冒險島';
     hr.innerHTML = '';
+    if(hSub){ hSub.textContent = subs[currentPage]||''; hSub.classList.toggle('hidden', !subs[currentPage]); }
+    if(hBadge){ hBadge.textContent = '👨‍✈️ 船長後台'; hBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-accent-blue/15 text-accent-blue'; }
     el.innerHTML = currentPage==='home' ? captainHome()
                  : currentPage==='tasks' ? captainTasks()
                  : currentPage==='rewards' ? captainRewards()
@@ -1099,7 +1127,10 @@ function renderPage(){
                  : currentPage==='kids' ? captainKids() : '';
   } else {
     const titles = {home:`嗨，${currentUser?.name||'冒險家'} 🚀`, tasks:'我的任務 ✅', store:'貝殼幣商城 🐚', history:'歷程紀錄 📖'};
+    const subs = {home:'今天要完成什麼呢？', tasks:'加油完成任務吧！', store:'看看有什麼好東西', history:'你的冒險成績單'};
     ht.textContent = titles[currentPage] || '冒險島';
+    if(hSub){ hSub.textContent = subs[currentPage]||''; hSub.classList.toggle('hidden', !subs[currentPage]); }
+    if(hBadge){ hBadge.textContent = '🧒 冒險家模式'; hBadge.className = 'text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-accent-gold/15 text-accent-gold'; }
     const coins = currentUser?.coins || 0;
     const streak = currentUser?.streak || 0;
     hr.innerHTML = `
@@ -3469,11 +3500,28 @@ function copyInviteCode(){
   }).catch(() => { showToast(`邀請碼: ${code}`,'blue'); });
 }
 
+function showLogoutConfirm(){
+  const isCap = userRole === 'captain';
+  showModal(`
+    <div class="text-center">
+      <div class="w-14 h-14 rounded-2xl ${isCap?'bg-accent-blue/10':'bg-accent-gold/10'} flex items-center justify-center mx-auto mb-3">
+        <span class="text-3xl">${isCap?'👨‍✈️':'🧒'}</span>
+      </div>
+      <h3 class="text-lg font-bold mb-2">確定要${isCap?'登出':'離開冒險'}嗎？</h3>
+      <p class="text-sm text-gray-400 mb-6">${isCap?'離開船長後台後，其他裝置仍可繼續使用。':'記得完成今天的任務再走喔！'}</p>
+      <div class="flex gap-2">
+        <button onclick="closeModal()" class="flex-1 card py-3 text-sm font-bold text-gray-400 hover:text-white transition-all">取消</button>
+        <button onclick="closeModal();logout()" class="flex-1 bg-red-500 text-white py-3 rounded-xl text-sm font-bold transition-all active:scale-95 hover:brightness-110">${isCap?'👨‍✈️ 登出':'🧒 離開'}</button>
+      </div>
+    </div>`, '380px');
+}
+
 function logout(){
   clearPageListeners();
   coreListeners.forEach(fn => fn());
   coreListeners = [];
   familyData = { tasks:[], rewards:[], redemptions:[], reminders:[], members:{} };
+  familyKids = [];
   currentUser = null; userFamily = null; userRole = null; liffUserId = null;
   historyLastDoc = null;
   document.getElementById('mainApp').classList.add('hidden');
