@@ -45,6 +45,15 @@ tailwind.config={theme:{extend:{
 @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 textarea,input,select{background:#13141C!important;border-color:#2A2D3E!important;color:#E5E7EB!important;}
 textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:none!important;}
+.tab-bar{display:flex;gap:0;background:#1C1E2A;border:1px solid #2A2D3E;border-radius:14px;padding:3px;position:sticky;top:0;z-index:20;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.tab-bar::-webkit-scrollbar{display:none;}
+.tab-btn{flex:1;min-width:0;white-space:nowrap;padding:8px 6px;border-radius:11px;font-size:12px;font-weight:600;color:#6B7280;text-align:center;transition:all .2s ease;cursor:pointer;border:none;background:transparent;position:relative;}
+.tab-btn.active{background:#3B82F6;color:#fff;box-shadow:0 2px 8px rgba(59,130,246,.3);}
+.tab-btn .tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;border-radius:99px;font-size:10px;font-weight:700;margin-left:3px;}
+.tab-btn.active .tab-badge{background:rgba(255,255,255,.25);color:#fff;}
+.tab-btn:not(.active) .tab-badge{background:#2A2D3E;color:#9CA3AF;}
+.tab-content{animation:tabFadeIn .25s ease forwards;}
+@keyframes tabFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body class="bg-dark-900 text-gray-200 min-h-screen" style="font-family:'Inter','Noto Sans TC',sans-serif">
@@ -274,6 +283,11 @@ const REWARD_TEMPLATES = [
 const REWARD_CATS = ['全部','娛樂','美食','體驗','親子','特權'];
 let rewardTemplateCat = '全部';
 let rewardHistoryExpanded = false;
+// Tab state
+let rewardTab = 0;   // 0=待審核, 1=獎勵管理, 2=兌換紀錄
+let taskTab = 0;     // 0=待審核, 1=任務管理, 2=已完成
+let historyFilter = '全部';  // 全部 / approved / rejected
+let historySort = 'newest';  // newest / oldest
 
 const REWARD_CAT_ICONS = {
   '全部':'ph-squares-four','娛樂':'ph-game-controller','美食':'ph-cookie',
@@ -346,6 +360,10 @@ function showModal(html, maxW){
 function closeModal(){
   const ov = document.getElementById('modalOv');
   ov.classList.add('hidden'); ov.classList.remove('flex');
+}
+
+function tabBar(tabs, activeIdx, onClickFn){
+  return `<div class="tab-bar mb-4">${tabs.map((t,i) => `<button onclick="${onClickFn}(${i})" class="tab-btn ${i===activeIdx?'active':''}">${t.emoji} ${t.label}${t.count!=null?`<span class="tab-badge">${t.count}</span>`:''}</button>`).join('')}</div>`;
 }
 
 function empty(icon, title, sub, btnTxt, btnFn){
@@ -853,6 +871,10 @@ function switchPage(pageId){
   renderPage();
   updateNavActive();
 }
+function switchRewardTab(idx){ rewardTab=idx; renderPage(); }
+function switchTaskTab(idx){ taskTab=idx; renderPage(); }
+function setHistoryFilter(f){ historyFilter=f; renderPage(); }
+function setHistorySort(s){ historySort=s; renderPage(); }
 
 function updateNavActive(){
   const ns = userRole === 'captain' ? NAV_CAPTAIN : NAV_KID;
@@ -1072,66 +1094,80 @@ function redemptionReviewCard(r){
 function captainTasks(){
   const submitted = familyData.tasks.filter(t => t.status==='submitted');
   const pending = familyData.tasks.filter(t => t.status==='pending');
-  const completed = familyData.tasks.filter(t => t.status==='completed');
+  const completed = familyData.tasks.filter(t => t.status==='completed').sort((a,b) => (b.completedAt?.seconds||b.createdAt?.seconds||0) - (a.completedAt?.seconds||a.createdAt?.seconds||0));
   const kids = Object.values(familyData.members).filter(m => m.role==='kid');
 
-  return `<div class="space-y-5">
-    <div class="card p-4">
-      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">快速套用模板</p>
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-4">
-        ${TASK_TEMPLATES.map(t => `
-        <button onclick="applyTemplate('${t.title}','${t.cat}',${t.pts})" class="card p-2.5 flex items-center gap-2 card-press hover:border-accent-blue/40 transition-all text-left">
-          <span class="text-lg shrink-0">${t.emoji}</span>
-          <div class="min-w-0 flex-1">
-            <p class="text-xs font-semibold text-white truncate">${t.title}</p>
-            <p class="text-[10px] text-accent-gold">+${t.pts} 🐚</p>
-          </div>
-        </button>`).join('')}
-      </div>
-    </div>
+  const tabs = [
+    {emoji:'📥', label:'待審核', count:submitted.length},
+    {emoji:'📋', label:'任務管理', count:pending.length},
+    {emoji:'✅', label:'已完成', count:completed.length},
+  ];
 
-    <div class="card p-4">
-      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">新增任務</p>
-      <div class="space-y-3">
-        <input id="nTitle" type="text" placeholder="任務名稱…" class="w-full border rounded-xl px-4 py-3 text-sm">
-        <div>
-          <p class="text-xs text-gray-400 mb-2">指派給（可多選）</p>
-          <div id="nKidSelect" class="flex flex-wrap gap-2">
-            ${kids.map(k => `<button type="button" onclick="toggleKidSelect(this,'${k.id}')" data-kid="${k.id}" class="kid-chip border border-dark-600 rounded-xl px-3 py-2 text-sm transition-all hover:border-accent-blue/50 flex items-center gap-1.5"><span class="kid-check w-4 h-4 rounded-full border border-dark-600 flex items-center justify-center text-[10px] shrink-0"></span><span>${k.name}</span></button>`).join('')}
-            ${kids.length===0?'<span class="text-xs text-gray-500">尚無小冒險家</span>':''}
-          </div>
-          <p class="text-[10px] text-gray-600 mt-1">💡 可選擇多位，將為每位小冒險家各建立一筆任務</p>
+  let content = '';
+
+  if(taskTab===0){
+    // Tab 1: 待審核
+    content = `<div class="tab-content space-y-3">
+      ${submitted.length>0? submitted.map(t => reviewCard(t)).join('')
+      : empty('ph-list-checks','沒有待審核任務','小冒險家完成任務後會出現在這裡','')}
+    </div>`;
+  } else if(taskTab===1){
+    // Tab 2: 任務管理（新增 + 進行中列表）
+    content = `<div class="tab-content space-y-4">
+      <div class="card p-4">
+        <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">快速套用模板</p>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-4">
+          ${TASK_TEMPLATES.map(t => `
+          <button onclick="applyTemplate('${t.title}','${t.cat}',${t.pts})" class="card p-2.5 flex items-center gap-2 card-press hover:border-accent-blue/40 transition-all text-left">
+            <span class="text-lg shrink-0">${t.emoji}</span>
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-semibold text-white truncate">${t.title}</p>
+              <p class="text-[10px] text-accent-gold">+${t.pts} 🐚</p>
+            </div>
+          </button>`).join('')}
         </div>
-        <div class="grid grid-cols-2 gap-2">
-          <select id="nCat" class="border rounded-xl px-3 py-3 text-sm">
-            <option value="學習">學習</option><option value="家事">家事</option>
-            <option value="運動">運動</option><option value="健康">健康</option>
-            <option value="創意">創意</option><option value="關懷">關懷</option>
-            <option value="才藝">才藝</option><option value="其他">其他</option>
-          </select>
-          <input id="nPts" type="number" value="20" placeholder="貝殼幣" class="border rounded-xl px-3 py-3 text-sm text-center">
-        </div>
-        <button id="addTaskBtn" onclick="vibrate(10);addTask()" class="w-full bg-accent-blue text-white px-5 py-3 rounded-xl text-sm font-bold transition-all active:scale-90 hover:brightness-110 flex items-center justify-center gap-1 opacity-50 cursor-not-allowed" disabled>
-          <i class="ph-fill ph-plus"></i> 新增任務
-        </button>
       </div>
-    </div>
+      <div class="card p-4">
+        <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">新增任務</p>
+        <div class="space-y-3">
+          <input id="nTitle" type="text" placeholder="任務名稱…" class="w-full border rounded-xl px-4 py-3 text-sm">
+          <div>
+            <p class="text-xs text-gray-400 mb-2">指派給（可多選）</p>
+            <div id="nKidSelect" class="flex flex-wrap gap-2">
+              ${kids.map(k => `<button type="button" onclick="toggleKidSelect(this,'${k.id}')" data-kid="${k.id}" class="kid-chip border border-dark-600 rounded-xl px-3 py-2 text-sm transition-all hover:border-accent-blue/50 flex items-center gap-1.5"><span class="kid-check w-4 h-4 rounded-full border border-dark-600 flex items-center justify-center text-[10px] shrink-0"></span><span>${k.name}</span></button>`).join('')}
+              ${kids.length===0?'<span class="text-xs text-gray-500">尚無小冒險家</span>':''}
+            </div>
+            <p class="text-[10px] text-gray-600 mt-1">💡 可選擇多位，將為每位小冒險家各建立一筆任務</p>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <select id="nCat" class="border rounded-xl px-3 py-3 text-sm">
+              <option value="學習">學習</option><option value="家事">家事</option>
+              <option value="運動">運動</option><option value="健康">健康</option>
+              <option value="創意">創意</option><option value="關懷">關懷</option>
+              <option value="才藝">才藝</option><option value="其他">其他</option>
+            </select>
+            <input id="nPts" type="number" value="20" placeholder="貝殼幣" class="border rounded-xl px-3 py-3 text-sm text-center">
+          </div>
+          <button id="addTaskBtn" onclick="vibrate(10);addTask()" class="w-full bg-accent-blue text-white px-5 py-3 rounded-xl text-sm font-bold transition-all active:scale-90 hover:brightness-110 flex items-center justify-center gap-1 opacity-50 cursor-not-allowed" disabled>
+            <i class="ph-fill ph-plus"></i> 新增任務
+          </button>
+        </div>
+      </div>
+      <div>
+        <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">進行中（${pending.length}）</p>
+        ${pending.length>0?`<div class="space-y-2">${pending.map(t => taskRow(t)).join('')}</div>`:empty('ph-list-checks','沒有進行中的任務','新增任務讓小冒險家開始挑戰','')}
+      </div>
+    </div>`;
+  } else {
+    // Tab 3: 已完成
+    content = `<div class="tab-content space-y-2">
+      ${completed.length>0? completed.slice(0,20).map(t => taskRow(t)).join('')
+      : empty('ph-check-circle','還沒有完成的任務','小冒險家完成任務後會記錄在這裡','')}
+      ${completed.length>20?`<p class="text-center text-xs text-gray-600 mt-3">顯示最近 20 筆，共 ${completed.length} 筆</p>`:''}
+    </div>`;
+  }
 
-    ${submitted.length>0?`<div>
-      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">待審核（${submitted.length}）</p>
-      <div class="space-y-3">${submitted.map(t => reviewCard(t)).join('')}</div>
-    </div>`:''}
-
-    <div>
-      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">進行中（${pending.length}）</p>
-      ${pending.length>0?`<div class="space-y-2">${pending.map(t => taskRow(t)).join('')}</div>`:empty('ph-list-checks','沒有進行中的任務','新增任務讓小冒險家開始挑戰','')}
-    </div>
-
-    ${completed.length>0?`<div>
-      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">已完成（${completed.length}）</p>
-      <div class="space-y-2 opacity-70">${completed.slice(0,5).map(t => taskRow(t)).join('')}</div>
-    </div>`:''}
-  </div>`;
+  return `<div>${tabBar(tabs, taskTab, 'switchTaskTab')}${content}</div>`;
 }
 
 function taskRow(t){
@@ -1155,69 +1191,88 @@ function taskRow(t){
 // ══════════════════════════════════════
 // Captain: Rewards
 // ══════════════════════════════════════
+function rewardInventoryCard(r){
+  const soldOut = (r.stock||0) <= 0;
+  const lowStock = (r.stock||0) > 0 && (r.stock||0) < 3;
+  const cc = CAT_COLORS[r.category] || 'text-gray-400 bg-dark-700';
+  return `<div class="card p-4 ${soldOut?'opacity-50':''}">
+    <div class="flex items-center gap-3">
+      <div class="w-12 h-12 rounded-xl ${soldOut?'bg-dark-700':'bg-accent-gold/10'} flex items-center justify-center shrink-0 relative">
+        ${r.emoji?`<span class="text-2xl">${r.emoji}</span>`:`<i class="ph-fill ${r.icon||'ph-gift'} ${soldOut?'text-gray-600':'text-accent-gold'} text-2xl"></i>`}
+        ${soldOut?'<span class="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">售完</span>':''}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-0.5">
+          <p class="font-semibold text-white truncate ${soldOut?'line-through text-gray-500':''}">${r.title}</p>
+          ${r.category?`<span class="badge text-[9px] ${cc}">${r.category}</span>`:''}
+        </div>
+        <div class="flex items-center gap-3 text-xs">
+          <span class="text-accent-gold font-bold">${r.cost||0} 🐚</span>
+          <span class="${lowStock?'text-red-400':soldOut?'text-gray-600':'text-gray-400'}">庫存 <b>${r.stock||0}</b></span>
+        </div>
+      </div>
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button onclick="vibrate(5);restock('${r.id}')" class="bg-dark-700 text-accent-green w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 hover:bg-accent-green/10" title="補貨+1"><i class="ph ph-plus text-sm"></i></button>
+        <button onclick="vibrate(5);showEditRewardModal('${r.id}')" class="bg-dark-700 text-accent-blue w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 hover:bg-accent-blue/10" title="編輯"><i class="ph ph-pencil-simple text-sm"></i></button>
+        <button onclick="vibrate(5);deleteReward('${r.id}')" class="bg-dark-700 text-red-400 w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 hover:bg-red-400/10" title="刪除"><i class="ph ph-trash text-sm"></i></button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function captainRewards(){
   const pr = familyData.redemptions.filter(r => r.status==='pending');
-  const history = familyData.redemptions.filter(r => r.status!=='pending').sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
-  const showHistory = rewardHistoryExpanded ? history : history.slice(0,5);
+  const allHistory = familyData.redemptions.filter(r => r.status!=='pending');
+  const filtered = historyFilter==='全部' ? allHistory : allHistory.filter(r => r.status===historyFilter);
+  const sorted = filtered.sort((a,b) => historySort==='newest'
+    ? (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)
+    : (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0));
+  const showHistory = sorted.slice(0, 20);
 
-  return `<div class="space-y-5">
-    <!-- Block 1: 待審核兌換 -->
-    <div>
-      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3"><i class="ph ph-clock-countdown mr-1"></i>待審核兌換（${pr.length}）</p>
-      ${pr.length>0?`<div class="space-y-3">${pr.map(r => redemptionReviewCard(r)).join('')}</div>`
-      :empty('ph-gift','沒有待審核的兌換','小冒險家還沒送出兌換申請','')}
-    </div>
+  const tabs = [
+    {emoji:'📥', label:'待審核', count:pr.length},
+    {emoji:'📦', label:'獎勵管理', count:familyData.rewards.length},
+    {emoji:'📜', label:'兌換紀錄', count:allHistory.length},
+  ];
 
-    <!-- Block 2: 獎勵庫存 -->
-    <div>
-      <div class="flex justify-between items-center mb-3">
-        <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest"><i class="ph ph-package mr-1"></i>獎勵庫存（${familyData.rewards.length}）</p>
-        <button onclick="showAddRewardModal()" class="text-xs text-accent-blue flex items-center gap-1 font-bold transition-all active:scale-95"><i class="ph ph-plus-circle"></i>新增獎勵</button>
-      </div>
-      ${familyData.rewards.length>0?`<div class="space-y-3">${familyData.rewards.map(r => {
-        const soldOut = (r.stock||0) <= 0;
-        const lowStock = (r.stock||0) > 0 && (r.stock||0) < 3;
-        const cc = CAT_COLORS[r.category] || 'text-gray-400 bg-dark-700';
-        return `<div class="card p-4 ${soldOut?'opacity-50':''}">
-          <div class="flex items-center gap-3">
-            <div class="w-12 h-12 rounded-xl ${soldOut?'bg-dark-700':'bg-accent-gold/10'} flex items-center justify-center shrink-0 relative">
-              <span class="text-2xl">${r.emoji||''}</span>
-              ${!r.emoji?`<i class="ph-fill ${r.icon||'ph-gift'} ${soldOut?'text-gray-600':'text-accent-gold'} text-2xl"></i>`:''}
-              ${soldOut?'<span class="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">售完</span>':''}
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 mb-0.5">
-                <p class="font-semibold text-white truncate ${soldOut?'line-through text-gray-500':''}">${r.title}</p>
-                ${r.category?`<span class="badge text-[9px] ${cc}">${r.category}</span>`:''}
-              </div>
-              <div class="flex items-center gap-3 text-xs">
-                <span class="text-accent-gold font-bold">${r.cost||0} 🐚</span>
-                <span class="${lowStock?'text-red-400':soldOut?'text-gray-600':'text-gray-400'}">庫存 <b>${r.stock||0}</b></span>
-              </div>
-            </div>
-            <div class="flex items-center gap-1.5 shrink-0">
-              <button onclick="vibrate(5);restock('${r.id}')" class="bg-dark-700 text-accent-green w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 hover:bg-accent-green/10" title="補貨+1"><i class="ph ph-plus text-sm"></i></button>
-              <button onclick="vibrate(5);showEditRewardModal('${r.id}')" class="bg-dark-700 text-accent-blue w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 hover:bg-accent-blue/10" title="編輯"><i class="ph ph-pencil-simple text-sm"></i></button>
-              <button onclick="vibrate(5);deleteReward('${r.id}')" class="bg-dark-700 text-red-400 w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 hover:bg-red-400/10" title="刪除"><i class="ph ph-trash text-sm"></i></button>
-            </div>
-          </div>
-        </div>`;
-      }).join('')}
-      </div>`:empty('ph-gift','還沒有獎勵','新增獎勵讓小冒險家兌換吧','新增獎勵','showAddRewardModal()')}
-    </div>
+  let content = '';
 
-    <!-- Block 3: 兌換紀錄（可收合） -->
-    ${history.length>0?`<div>
-      <div class="flex justify-between items-center mb-3">
-        <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest"><i class="ph ph-scroll mr-1"></i>兌換紀錄（${history.length}）</p>
-        ${history.length>5?`<button onclick="rewardHistoryExpanded=!rewardHistoryExpanded;renderPage()" class="text-xs text-accent-blue font-bold flex items-center gap-1 transition-all active:scale-95">
-          <i class="ph ${rewardHistoryExpanded?'ph-caret-up':'ph-caret-down'}"></i>${rewardHistoryExpanded?'收合':'查看全部'}
-        </button>`:''}
+  if(rewardTab===0){
+    // Tab 1: 待審核
+    content = `<div class="tab-content space-y-3">
+      ${pr.length>0? pr.map(r => redemptionReviewCard(r)).join('')
+      : empty('ph-gift','沒有待審核的兌換','小冒險家還沒送出兌換申請','')}
+    </div>`;
+  } else if(rewardTab===1){
+    // Tab 2: 獎勵管理
+    content = `<div class="tab-content space-y-4">
+      <button onclick="showAddRewardModal()" class="w-full card p-4 flex items-center justify-center gap-2 text-accent-blue font-bold text-sm transition-all active:scale-95 hover:border-accent-blue/40">
+        <i class="ph ph-plus-circle text-lg"></i> 新增獎勵
+      </button>
+      ${familyData.rewards.length>0?`<div class="space-y-3">${familyData.rewards.map(r => rewardInventoryCard(r)).join('')}</div>`
+      :empty('ph-gift','還沒有獎勵','新增獎勵讓小冒險家兌換吧','新增獎勵','showAddRewardModal()')}
+    </div>`;
+  } else {
+    // Tab 3: 兌換紀錄
+    content = `<div class="tab-content">
+      <div class="flex items-center gap-2 mb-4 flex-wrap">
+        <div class="flex gap-1 bg-dark-800 rounded-lg p-0.5">
+          ${['全部','approved','rejected'].map(f => {
+            const label = f==='全部'?'全部':f==='approved'?'已核准':'已駁回';
+            return `<button onclick="setHistoryFilter('${f}')" class="px-3 py-1.5 rounded-md text-xs font-bold transition-all ${historyFilter===f?'bg-dark-600 text-white':'text-gray-500 hover:text-gray-300'}">${label}</button>`;
+          }).join('')}
+        </div>
+        <button onclick="setHistorySort(historySort==='newest'?'oldest':'newest')" class="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-all">
+          <i class="ph ph-sort-descending"></i>${historySort==='newest'?'最新優先':'最舊優先'}
+        </button>
       </div>
-      <div class="space-y-2">${showHistory.map(r => historyCard(r)).join('')}
-      </div>
-    </div>`:''}
-  </div>`;
+      ${showHistory.length>0?`<div class="space-y-2">${showHistory.map(r => historyCard(r)).join('')}</div>`
+      :empty('ph-scroll','沒有兌換紀錄','兌換申請審核後會顯示在這裡','')}
+      ${sorted.length>20?`<p class="text-center text-xs text-gray-600 mt-3">顯示最近 20 筆，共 ${sorted.length} 筆</p>`:''}
+    </div>`;
+  }
+
+  return `<div>${tabBar(tabs, rewardTab, 'switchRewardTab')}${content}</div>`;
 }
 
 // ══════════════════════════════════════
