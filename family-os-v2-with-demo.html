@@ -373,7 +373,6 @@ const NAV_CAPTAIN = [
 const NAV_KID = [
   {id:'home',      icon:'ph-fill ph-house',                    label:'首頁'},
   {id:'tasks',     icon:'ph-fill ph-list-checks',              label:'任務'},
-  {id:'mytickets', icon:'ph-fill ph-ticket',                   label:'票券'},
   {id:'store',     icon:'ph-fill ph-storefront',               label:'商城'},
   {id:'history',   icon:'ph-fill ph-clock-counter-clockwise',  label:'歷程'},
 ];
@@ -864,13 +863,6 @@ function setupPageListeners(page){
         renderPage();
       }));
     }
-    if(page === 'mytickets'){
-      fsLog('snapshots', 'page: redemptions (mytickets)');
-      activeListeners.push(famRef.collection('redemptions').where('userId','==',liffUserId).onSnapshot(snap => {
-        familyData.redemptions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        renderPage();
-      }));
-    }
     if(page === 'store'){
       // [P2] 獎勵用快取 + 一次讀取
       const cachedRewards = cacheGet('rewards_' + userFamily.id);
@@ -1041,7 +1033,7 @@ function renderPage(){
                  : currentPage==='rewards' ? captainRewards()
                  : currentPage==='reminders' ? captainReminders() : '';
   } else {
-    const titles = {home:`嗨，${currentUser?.name||'冒險家'} 🚀`, tasks:'我的任務 ✅', mytickets:'我的票券 🎫', store:'貝殼幣商城 🐚', history:'歷程紀錄 📖'};
+    const titles = {home:`嗨，${currentUser?.name||'冒險家'} 🚀`, tasks:'我的任務 ✅', store:'貝殼幣商城 🐚', history:'歷程紀錄 📖'};
     ht.textContent = titles[currentPage] || '冒險島';
     const coins = currentUser?.coins || 0;
     const streak = currentUser?.streak || 0;
@@ -1050,7 +1042,6 @@ function renderPage(){
       ${streak>0?`<span class="card px-2 py-1.5 flex items-center gap-1"><span style="display:inline-block;animation:fl 0.8s ease-in-out infinite alternate">🔥</span><span class="text-orange-400 font-bold text-xs">${streak}</span></span>`:''}`;
     el.innerHTML = currentPage==='home' ? kidHome()
                  : currentPage==='tasks' ? kidTasks()
-                 : currentPage==='mytickets' ? kidRewardsTab(true)
                  : currentPage==='store' ? kidStore()
                  : currentPage==='history' ? kidHistory() : '';
   }
@@ -1735,7 +1726,8 @@ function captainReminders(){
 // ══════════════════════════════════════
 // Kid: Home
 // ══════════════════════════════════════
-function kidRewardsTab(full){
+function kidRewardsTab(){
+  const full = kidRewardHistoryExpanded;
   const coins = currentUser?.coins || 0;
   const approved = familyData.redemptions
     .filter(r => r.userId===liffUserId && r.status==='approved')
@@ -1804,7 +1796,7 @@ function kidRewardsTab(full){
       </div>`}
     </div>
 
-    ${hasMore?`<button onclick="vibrate(5);switchPage('mytickets')" class="w-full card p-3 text-center text-sm text-accent-gold font-bold hover:bg-dark-700 transition-colors card-press">查看完整票券 →</button>`:''}
+    ${hasMore?`<button onclick="vibrate(5);kidRewardHistoryExpanded=!kidRewardHistoryExpanded;renderPage()" class="w-full card p-3 text-center text-sm text-accent-gold font-bold hover:bg-dark-700 transition-colors card-press">${kidRewardHistoryExpanded?'收合':'展開全部票券 →'}</button>`:''}
   </div>`;
 }
 
@@ -1960,7 +1952,7 @@ function kidHome(){
     {emoji:'🏆', label:'我的成就', count:earned.length||null}
   ], kidHomeTab, 'switchKidHomeTab');
 
-  if(kidHomeTab===1) return `<div>${tabsHtml}${kidRewardsTab(false)}</div>`;
+  if(kidHomeTab===1) return `<div>${tabsHtml}${kidRewardsTab()}</div>`;
   if(kidHomeTab===2) return `<div>${tabsHtml}${kidAchievementsTab()}</div>`;
 
   // Tab 0: 今日冒險
