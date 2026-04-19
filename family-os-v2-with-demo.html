@@ -296,7 +296,7 @@ let rewardTemplateCat = '全部';
 let rewardHistoryExpanded = false;
 // Tab state
 let rewardTab = 0;   // 0=獎勵管理, 1=審核中心, 2=兌換紀錄
-let taskTab = 0;     // 0=待審核, 1=任務管理, 2=已完成
+let taskTab = 0;     // 0=任務管理, 1=待審核, 2=已完成
 let historyFilter = '全部';  // 全部 / approved / rejected
 let historySort = 'newest';  // newest / oldest
 let reminderTab = 0;         // 0=新增提醒, 1=提醒清單
@@ -310,6 +310,8 @@ let kidHistoryTab = 0;       // 0=累積成就, 1=寵物成長, 2=獎勵歷程, 
 let reportMonth = new Date().getMonth(); // 0-11
 let reportYear = new Date().getFullYear();
 let familyKids = [];  // 船長端：家庭內的小冒險家列表
+let currentReminderIndex = 0;
+let reminderInterval = null;
 
 const REMINDER_TEMPLATES = [
   // 早晨
@@ -934,9 +936,9 @@ function setupPageListeners(page){
       }));
     }
     if(page === 'home'){
-      // 首頁需要 reminders（船長的話）— 用 .get() 一次讀取即可
+      // 首頁需要 reminders（船長的話輪播）— 用 .get() 一次讀取全部啟用中的
       fsLog('reads', 'reminders (one-time for kid home)');
-      famRef.collection('reminders').where('isActive','==',true).limit(5).get().then(snap => {
+      famRef.collection('reminders').where('isActive','==',true).orderBy('createdAt','desc').get().then(snap => {
         familyData.reminders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         renderPage();
       });
@@ -1060,10 +1062,39 @@ function switchRewardTab(idx){ rewardTab=idx; renderPage(); }
 function switchTaskTab(idx){ taskTab=idx; renderPage(); }
 function switchReminderTab(idx){ reminderTab=idx; renderPage(); }
 function switchCaptainHomeTab(idx){ captainHomeTab=idx; renderPage(); }
-function switchKidHomeTab(idx){ kidHomeTab=idx; renderPage(); }
+function switchKidHomeTab(idx){ kidHomeTab=idx; currentReminderIndex=0; renderPage(); }
 function switchStoreCat(cat){ storeCat=cat; renderPage(); }
 function switchStoreSort(s){ storeSort=s; renderPage(); }
 function switchKidHistoryTab(idx){ kidHistoryTab=idx; renderPage(); }
+function stopReminderCarousel(){
+  if(reminderInterval){ clearInterval(reminderInterval); reminderInterval=null; }
+}
+function startReminderCarousel(){
+  stopReminderCarousel();
+  const rems = familyData.reminders.filter(r => r.isActive !== false);
+  if(rems.length < 2) return; // No carousel needed for 0-1 items
+  reminderInterval = setInterval(() => {
+    const emojiEl = document.getElementById('reminderEmoji');
+    const msgEl = document.getElementById('reminderMsg');
+    if(!emojiEl || !msgEl){ stopReminderCarousel(); return; }
+    // Fade out
+    emojiEl.style.opacity = '0'; msgEl.style.opacity = '0';
+    setTimeout(() => {
+      currentReminderIndex = (currentReminderIndex + 1) % rems.length;
+      const cur = rems[currentReminderIndex];
+      emojiEl.textContent = cur.emoji || '💡';
+      msgEl.textContent = cur.message || '';
+      // Update dots
+      document.querySelectorAll('[data-reminder-dot]').forEach((d,i) => {
+        d.classList.toggle('bg-accent-blue', i===currentReminderIndex);
+        d.classList.toggle('bg-accent-blue/30', i!==currentReminderIndex);
+      });
+      // Fade in
+      emojiEl.style.opacity = '1'; msgEl.style.opacity = '1';
+    }, 300);
+  }, 6000);
+}
+
 function shiftReportMonth(delta){
   reportMonth += delta;
   if(reportMonth<0){ reportMonth=11; reportYear--; }
@@ -1163,6 +1194,12 @@ function renderPage(){
                  : currentPage==='tasks' ? kidTasks()
                  : currentPage==='store' ? kidStore()
                  : currentPage==='history' ? kidHistory() : '';
+  }
+
+  // Manage reminder carousel: start only on kid home tab 0
+  stopReminderCarousel();
+  if(userRole !== 'captain' && currentPage === 'home' && kidHomeTab === 0){
+    startReminderCarousel();
   }
 }
 
@@ -1458,11 +1495,11 @@ function captainHome(){
     ${todayTimeline()}
 
     <div class="grid grid-cols-3 gap-2">
-      <button onclick="vibrate(5);taskTab=1;switchPage('tasks')" class="card p-3 flex flex-col items-center gap-1.5 card-press hover:border-accent-blue/40 transition-all">
+      <button onclick="vibrate(5);taskTab=0;switchPage('tasks')" class="card p-3 flex flex-col items-center gap-1.5 card-press hover:border-accent-blue/40 transition-all">
         <i class="ph-fill ph-plus-circle text-accent-blue text-xl"></i>
         <p class="text-[10px] text-white font-bold">新增任務</p>
       </button>
-      <button onclick="vibrate(5);taskTab=0;switchPage('tasks')" class="card p-3 flex flex-col items-center gap-1.5 card-press hover:border-accent-gold/40 transition-all relative">
+      <button onclick="vibrate(5);taskTab=1;switchPage('tasks')" class="card p-3 flex flex-col items-center gap-1.5 card-press hover:border-accent-gold/40 transition-all relative">
         <i class="ph-fill ph-list-checks text-accent-gold text-xl"></i>
         <p class="text-[10px] text-white font-bold">審核中</p>
         ${pending.length>0?`<span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-[9px] text-white font-bold flex items-center justify-center">${pending.length}</span>`:''}
@@ -1547,21 +1584,15 @@ function captainTasks(){
   const kids = Object.values(familyData.members).filter(m => m.role==='kid');
 
   const tabs = [
-    {emoji:'📥', label:'待審核', count:submitted.length},
     {emoji:'📋', label:'任務管理', count:pending.length},
+    {emoji:'📥', label:'待審核', count:submitted.length},
     {emoji:'✅', label:'已完成', count:completed.length},
   ];
 
   let content = '';
 
   if(taskTab===0){
-    // Tab 1: 待審核
-    content = `<div class="tab-content space-y-3">
-      ${submitted.length>0? submitted.map(t => reviewCard(t)).join('')
-      : empty('ph-list-checks','沒有待審核任務','小冒險家完成任務後會出現在這裡','')}
-    </div>`;
-  } else if(taskTab===1){
-    // Tab 2: 任務管理（新增 + 進行中列表）
+    // Tab 0: 任務管理（新增 + 進行中列表）
     content = `<div class="tab-content space-y-4">
       <div class="card p-4">
         <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">快速套用模板</p>
@@ -1606,6 +1637,12 @@ function captainTasks(){
         <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">進行中（${pending.length}）</p>
         ${pending.length>0?`<div class="space-y-2">${pending.map(t => taskRow(t)).join('')}</div>`:empty('ph-list-checks','沒有進行中的任務','新增任務讓小冒險家開始挑戰','')}
       </div>
+    </div>`;
+  } else if(taskTab===1){
+    // Tab 1: 待審核
+    content = `<div class="tab-content space-y-3">
+      ${submitted.length>0? submitted.map(t => reviewCard(t)).join('')
+      : empty('ph-list-checks','沒有待審核任務','小冒險家完成任務後會出現在這裡','')}
     </div>`;
   } else {
     // Tab 3: 已完成
@@ -2502,7 +2539,7 @@ function kidHome(){
   const todos = familyData.tasks.filter(t => taskIsFor(t,liffUserId) && t.status==='pending');
   const mySubmitted = familyData.tasks.filter(t => taskIsFor(t,liffUserId) && t.status==='submitted');
   const done = familyData.tasks.filter(t => taskIsFor(t,liffUserId) && t.status==='completed');
-  const activeReminder = familyData.reminders.find(r => r.isActive !== false);
+  const activeReminders = familyData.reminders.filter(r => r.isActive !== false);
   const nextAch = ACHIEVEMENTS.find(a => {
     if(a.type==='task_count') return done.length < a.threshold;
     if(a.type==='streak') return streak < a.threshold;
@@ -2543,14 +2580,19 @@ function kidHome(){
 
   // Tab 0: 今日冒險
   const content = `<div class="tab-content space-y-4">
-    ${activeReminder?`
-    <div class="rounded-2xl p-4 flex items-start gap-3" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25)">
-      <span class="text-2xl shrink-0">${activeReminder.emoji||'💡'}</span>
-      <div>
-        <p class="text-[10px] text-accent-blue font-bold mb-1 uppercase tracking-widest">船長的話</p>
-        <p class="text-sm text-white leading-relaxed">${activeReminder.message||''}</p>
-      </div>
-    </div>`:''}
+    ${(()=>{
+      const rems = activeReminders.length > 0 ? activeReminders : [{emoji:'💪', message:'今天也要加油喔'}];
+      const cur = rems[currentReminderIndex % rems.length] || rems[0];
+      const dots = activeReminders.length > 1 ? `<div class="flex justify-center gap-1.5 mt-2">${rems.map((_,i) => `<span data-reminder-dot class="w-1.5 h-1.5 rounded-full transition-all duration-300 ${i===(currentReminderIndex%rems.length)?'bg-accent-blue':'bg-accent-blue/30'}"></span>`).join('')}</div>` : '';
+      return `<div class="rounded-2xl p-4" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25)">
+      <div class="flex items-start gap-3">
+        <span id="reminderEmoji" class="text-2xl shrink-0 transition-opacity duration-300">${cur.emoji||'💡'}</span>
+        <div class="flex-1 min-w-0">
+          <p class="text-[10px] text-accent-blue font-bold mb-1 uppercase tracking-widest">船長的話</p>
+          <p id="reminderMsg" class="text-sm text-white leading-relaxed transition-opacity duration-300">${cur.message||''}</p>
+        </div>
+      </div>${dots}</div>`;
+    })()}
 
     <div class="card p-4 blue-glow flex items-center gap-4">
       <div class="shrink-0 text-center">
