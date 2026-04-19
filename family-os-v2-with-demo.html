@@ -304,6 +304,7 @@ let storeSort = 'cheap';    // cheap / newest / popular
 let kidHistoryTab = 0;       // 0=累積成就, 1=寵物成長, 2=獎勵歷程, 3=活動日記
 let reportMonth = new Date().getMonth(); // 0-11
 let reportYear = new Date().getFullYear();
+let familyKids = [];  // 船長端：家庭內的小冒險家列表
 
 const REMINDER_TEMPLATES = [
   // 早晨
@@ -369,6 +370,7 @@ const NAV_CAPTAIN = [
   {id:'tasks',    icon:'ph-fill ph-list-checks',   label:'任務管理'},
   {id:'rewards',  icon:'ph-fill ph-gift',          label:'獎勵中心'},
   {id:'reminders',icon:'ph-fill ph-bell-ringing',  label:'貼心提醒'},
+  {id:'kids',     icon:'ph-fill ph-users-three',   label:'冒險家管理'},
 ];
 const NAV_KID = [
   {id:'home',      icon:'ph-fill ph-house',                    label:'首頁'},
@@ -615,6 +617,20 @@ async function ensureDemoData(){
         reviewedAt:ago(200), reviewedBy:'demo-captain'
       });
       await batch.commit();
+    }
+    // 遷移既有 demo kids：補上 kidCode, avatar, pin, hasPin 欄位
+    const kid1Doc = await db.collection('users').doc('demo-kid1').get();
+    if(kid1Doc.exists && !kid1Doc.data().kidCode){
+      fsLog('writes', 'migrate demo-kid1 with kidCode fields');
+      await db.collection('users').doc('demo-kid1').update({
+        kidCode:'KID-DEMO01', avatar:'🧒', pin:null, hasPin:false, userId:'demo-kid1', role:'kid'
+      });
+    }
+    if(kid2Doc.exists && !kid2Doc.data().kidCode){
+      fsLog('writes', 'migrate demo-kid2 with kidCode fields');
+      await db.collection('users').doc('demo-kid2').update({
+        kidCode:'KID-DEMO02', avatar:'👧', pin:null, hasPin:false, userId:'demo-kid2', role:'kid'
+      });
     }
   } catch(e){ console.warn('ensureDemoData:', e); }
 }
@@ -873,6 +889,13 @@ function setupPageListeners(page){
         renderPage();
       }));
     }
+    if(page === 'kids'){
+      fsLog('snapshots', 'page: users (kids)');
+      activeListeners.push(db.collection('users').where('familyId','==',userFamily.id).where('role','==','kid').onSnapshot(snap => {
+        familyKids = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderPage();
+      }));
+    }
   } else {
     // Kid 模式
     if(page === 'home' || page === 'tasks'){
@@ -1066,13 +1089,14 @@ function renderPage(){
   if(!el) return;
 
   if(userRole === 'captain'){
-    const titles = {home:'首頁總覽 ⚓', tasks:'任務管理 📋', rewards:'獎勵中心 🎁', reminders:'貼心提醒 🔔'};
+    const titles = {home:'首頁總覽 ⚓', tasks:'任務管理 📋', rewards:'獎勵中心 🎁', reminders:'貼心提醒 🔔', kids:'冒險家管理 👥'};
     ht.textContent = titles[currentPage] || 'AdventureKids 冒險島';
     hr.innerHTML = '';
     el.innerHTML = currentPage==='home' ? captainHome()
                  : currentPage==='tasks' ? captainTasks()
                  : currentPage==='rewards' ? captainRewards()
-                 : currentPage==='reminders' ? captainReminders() : '';
+                 : currentPage==='reminders' ? captainReminders()
+                 : currentPage==='kids' ? captainKids() : '';
   } else {
     const titles = {home:`嗨，${currentUser?.name||'冒險家'} 🚀`, tasks:'我的任務 ✅', store:'貝殼幣商城 🐚', history:'歷程紀錄 📖'};
     ht.textContent = titles[currentPage] || '冒險島';
@@ -1956,6 +1980,465 @@ function kidAchievementsTab(){
   </div>`;
 }
 
+// ══════════════════════════════════════
+// Captain: Kids Management
+// ══════════════════════════════════════
+const KID_AVATARS = ['🧒','👦','👧','🧒','👨','👩','👶','🦸','🧚','🦊','🐱','🐶'];
+const KID_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+async function generateKidCode(){
+  for(let attempt=0; attempt<10; attempt++){
+    let code = 'KID-';
+    for(let i=0; i<6; i++) code += KID_CODE_CHARS[Math.floor(Math.random()*KID_CODE_CHARS.length)];
+    const snap = await db.collection('users').where('kidCode','==',code).limit(1).get();
+    if(snap.empty) return code;
+  }
+  return 'KID-'+Date.now().toString(36).toUpperCase().slice(-6);
+}
+
+function captainKids(){
+  const kids = familyKids.sort((a,b) => (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0));
+  return `<div class="space-y-4">
+    <div class="flex items-center justify-between mb-2">
+      <p class="text-gray-400 text-sm">我的小冒險家</p>
+      <button onclick="vibrate(5);showAddKidModal()" class="flex items-center gap-1.5 bg-accent-blue text-white px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 hover:brightness-110">
+        <i class="ph ph-plus-circle text-base"></i> 新增小冒險家
+      </button>
+    </div>
+    ${kids.length>0 ? `<div class="grid grid-cols-1 md:grid-cols-2 gap-3">${kids.map(k => kidManageCard(k)).join('')}</div>`
+    : empty('ph-baby','還沒有小冒險家','點擊右上角新增，讓孩子一起加入冒險！','新增小冒險家','showAddKidModal()')}
+  </div>`;
+}
+
+function kidManageCard(k){
+  const completedTasks = familyData.tasks ? familyData.tasks.filter(t => t.status==='completed' && (t.assignedTo===k.id || (Array.isArray(t.assignedTo) && t.assignedTo.includes(k.id)))).length : 0;
+  return `<div class="card p-4 hover:translate-y-[-2px] transition-all duration-200">
+    <div class="flex items-start gap-3">
+      <div class="w-14 h-14 rounded-2xl bg-accent-purple/10 flex items-center justify-center shrink-0">
+        <span class="text-3xl">${k.avatar||'🧒'}</span>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="font-bold text-base text-white mb-1">${k.name||'小冒險家'}</p>
+        <button onclick="vibrate(3);copyText('${k.kidCode||''}')" class="font-mono text-accent-blue/80 text-xs bg-accent-blue/5 px-2 py-0.5 rounded-md hover:bg-accent-blue/10 transition-all cursor-pointer mb-1.5 inline-block" title="點擊複製">${k.kidCode||'—'}</button>
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-[10px] px-1.5 py-0.5 rounded-md ${k.hasPin?'bg-amber-500/10 text-amber-400':'bg-dark-700 text-gray-500'}">${k.hasPin?'🔒 已設定 PIN':'🔓 未設定 PIN'}</span>
+          <span class="text-[10px] text-gray-500">任務 <b class="text-gray-300">${completedTasks}</b></span>
+          <span class="text-[10px] text-gray-500">貝殼 <b class="text-accent-gold">${k.coins||0}</b></span>
+        </div>
+      </div>
+      <div class="flex flex-col gap-1.5 shrink-0">
+        <button onclick="vibrate(5);showKidLoginInfoModal('${k.id}')" class="bg-dark-700 text-accent-blue w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 hover:bg-accent-blue/10" title="登入資訊"><i class="ph ph-eye text-sm"></i></button>
+        <button onclick="vibrate(5);showEditKidModal('${k.id}')" class="bg-dark-700 text-accent-green w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 hover:bg-accent-green/10" title="編輯"><i class="ph ph-pencil-simple text-sm"></i></button>
+        <button onclick="vibrate(5);showDeleteKidModal('${k.id}')" class="bg-dark-700 text-red-400 w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 hover:bg-red-400/10" title="刪除"><i class="ph ph-trash text-sm"></i></button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function copyText(text){
+  if(!text) return;
+  navigator.clipboard.writeText(text).then(() => showToast('已複製到剪貼簿','blue')).catch(() => showToast('複製失敗','red'));
+}
+
+// ─── Add Kid Modal ───
+function showAddKidModal(){
+  showModal(`
+    <div id="addKidStep1">
+      <h3 class="text-lg font-bold mb-4 text-center">新增小冒險家</h3>
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">名字 <span class="text-red-400">*</span></label>
+          <input id="akName" type="text" maxlength="10" placeholder="例：小明、小美、寶貝" class="w-full bg-dark-800 border border-dark-600 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-accent-blue focus:outline-none transition-all"/>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 mb-2 block">選擇頭像 <span class="text-red-400">*</span></label>
+          <div class="grid grid-cols-4 gap-2" id="akAvatarGrid">
+            ${KID_AVATARS.map((e,i) => `<button onclick="selectKidAvatar('${e}',this)" class="h-14 rounded-xl bg-dark-800 border-2 ${i===0?'border-accent-blue ring-2 ring-accent-blue/30':'border-dark-600'} flex items-center justify-center text-2xl transition-all hover:border-accent-blue/50 akAvBtn">${e}</button>`).join('')}
+          </div>
+          <input type="hidden" id="akAvatar" value="${KID_AVATARS[0]}"/>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs text-gray-400">PIN 設定（選用）</label>
+            <button onclick="togglePinInput()" id="akPinToggle" class="w-10 h-5 rounded-full bg-dark-600 relative transition-all cursor-pointer">
+              <span class="absolute w-4 h-4 bg-gray-400 rounded-full top-0.5 left-0.5 transition-all" id="akPinDot"></span>
+            </button>
+          </div>
+          <div id="akPinSection" class="hidden">
+            <p class="text-[10px] text-gray-500 mb-3">PIN 是小冒險家登入時的簡單密碼，可以用生日月日或幸運數字。不設定則只要代碼就能登入。</p>
+            <div class="flex gap-3 justify-center">
+              <input id="akPin1" type="tel" maxlength="1" class="w-14 h-16 bg-dark-800 border-2 border-dark-600 rounded-xl text-center text-3xl text-white font-bold focus:border-accent-blue focus:outline-none transition-all" oninput="pinAutoFocus(this,'akPin2')"/>
+              <input id="akPin2" type="tel" maxlength="1" class="w-14 h-16 bg-dark-800 border-2 border-dark-600 rounded-xl text-center text-3xl text-white font-bold focus:border-accent-blue focus:outline-none transition-all" oninput="pinAutoFocus(this,'akPin3')"/>
+              <input id="akPin3" type="tel" maxlength="1" class="w-14 h-16 bg-dark-800 border-2 border-dark-600 rounded-xl text-center text-3xl text-white font-bold focus:border-accent-blue focus:outline-none transition-all" oninput="pinAutoFocus(this,'akPin4')"/>
+              <input id="akPin4" type="tel" maxlength="1" class="w-14 h-16 bg-dark-800 border-2 border-dark-600 rounded-xl text-center text-3xl text-white font-bold focus:border-accent-blue focus:outline-none transition-all"/>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="flex gap-2 mt-6">
+        <button onclick="closeModal()" class="flex-1 card py-3 text-sm font-bold text-gray-400 hover:text-white transition-all">取消</button>
+        <button onclick="createKid()" class="flex-1 bg-accent-blue text-white py-3 rounded-xl text-sm font-bold transition-all active:scale-95 hover:brightness-110">建立</button>
+      </div>
+    </div>`, '440px');
+}
+
+function selectKidAvatar(emoji, btn){
+  document.getElementById('akAvatar').value = emoji;
+  document.querySelectorAll('.akAvBtn').forEach(b => { b.classList.remove('border-accent-blue','ring-2','ring-accent-blue/30'); b.classList.add('border-dark-600'); });
+  btn.classList.remove('border-dark-600'); btn.classList.add('border-accent-blue','ring-2','ring-accent-blue/30');
+}
+
+let addKidPinOn = false;
+function togglePinInput(){
+  addKidPinOn = !addKidPinOn;
+  const sec = document.getElementById('akPinSection');
+  const tog = document.getElementById('akPinToggle');
+  const dot = document.getElementById('akPinDot');
+  if(addKidPinOn){
+    sec.classList.remove('hidden');
+    tog.classList.remove('bg-dark-600'); tog.classList.add('bg-accent-blue');
+    dot.classList.remove('left-0.5','bg-gray-400'); dot.classList.add('left-5','bg-white');
+  } else {
+    sec.classList.add('hidden');
+    tog.classList.remove('bg-accent-blue'); tog.classList.add('bg-dark-600');
+    dot.classList.remove('left-5','bg-white'); dot.classList.add('left-0.5','bg-gray-400');
+  }
+}
+
+function pinAutoFocus(cur, nextId){
+  cur.value = cur.value.replace(/\D/g,'');
+  if(cur.value && nextId){ const n = document.getElementById(nextId); if(n) n.focus(); }
+}
+
+async function createKid(){
+  const name = (document.getElementById('akName')?.value||'').trim();
+  const avatar = document.getElementById('akAvatar')?.value || '🧒';
+  if(!name){ showToast('請輸入名字','gold'); return; }
+  let pin = null;
+  if(addKidPinOn){
+    const p1=document.getElementById('akPin1')?.value||'';
+    const p2=document.getElementById('akPin2')?.value||'';
+    const p3=document.getElementById('akPin3')?.value||'';
+    const p4=document.getElementById('akPin4')?.value||'';
+    pin = p1+p2+p3+p4;
+    if(pin.length!==4){ showToast('請輸入完整 4 位 PIN','gold'); return; }
+  }
+  try {
+    showToast('建立中...','blue');
+    const kidCode = await generateKidCode();
+    const kidId = 'kid_' + Math.random().toString(36).slice(2,8);
+    const kidData = {
+      userId: kidId, kidCode: kidCode, pin: pin, hasPin: !!pin,
+      name: name, avatar: avatar, familyId: userFamily.id, role: 'kid',
+      createdBy: liffUserId, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      coins: 0, petEXP: 0, streak: 0
+    };
+    await db.collection('users').doc(kidId).set(kidData);
+    await db.collection('families').doc(userFamily.id).update({
+      members: firebase.firestore.FieldValue.arrayUnion(kidId)
+    });
+    cacheClear('family_'+userFamily.id);
+    addKidPinOn = false;
+    showKidCreatedModal(name, avatar, kidCode, pin);
+    showToast('小冒險家建立成功！','green');
+  } catch(e){ console.error('createKid error:', e); showToast('建立失敗：'+e.message,'red'); }
+}
+
+function showKidCreatedModal(name, avatar, kidCode, pin){
+  const baseUrl = location.href.replace(/\/[^/]*$/,'/kid.html');
+  showModal(`
+    <div class="text-center">
+      <h3 class="text-lg font-bold mb-1">✨ 建立成功！</h3>
+      <div class="w-16 h-16 rounded-2xl bg-accent-purple/10 flex items-center justify-center mx-auto mt-3 mb-1">
+        <span class="text-4xl">${avatar}</span>
+      </div>
+      <p class="font-bold text-base mb-4">${name}</p>
+      <div class="card p-4 text-left space-y-3 mb-4">
+        <p class="text-[10px] text-gray-500 text-center mb-2">把這張登入卡交給小冒險家</p>
+        <div>
+          <p class="text-[10px] text-gray-400 mb-1">🔑 登入代碼</p>
+          <div class="bg-dark-800 rounded-lg px-4 py-2.5 font-mono text-accent-blue text-lg font-bold text-center tracking-widest">${kidCode}</div>
+        </div>
+        ${pin ? `<div>
+          <p class="text-[10px] text-gray-400 mb-1">🔒 PIN</p>
+          <div class="bg-dark-800 rounded-lg px-4 py-2.5 font-mono text-amber-400 text-lg font-bold text-center tracking-widest">${pin}</div>
+        </div>` : ''}
+        <div>
+          <p class="text-[10px] text-gray-400 mb-1">🔗 登入網址</p>
+          <div class="bg-dark-800 rounded-lg px-3 py-2.5 text-xs text-gray-300 text-center break-all">${baseUrl}</div>
+        </div>
+      </div>
+      <div class="space-y-2">
+        <button onclick="copyKidInfo('${name}','${kidCode}','${pin||''}','${baseUrl}')" class="w-full bg-accent-blue text-white py-3 rounded-xl text-sm font-bold transition-all active:scale-95 hover:brightness-110">
+          <i class="ph ph-copy text-base mr-1"></i> 複製所有資訊
+        </button>
+        <button onclick="shareKidInfo('${name}','${kidCode}','${pin||''}','${baseUrl}')" class="w-full card py-3 text-sm font-bold text-accent-purple hover:text-white transition-all">
+          <i class="ph ph-share-network text-base mr-1"></i> 分享
+        </button>
+        <button onclick="closeModal()" class="w-full text-sm text-gray-500 py-2 hover:text-gray-300 transition-all">完成</button>
+      </div>
+    </div>`, '400px');
+}
+
+function copyKidInfo(name, code, pin, url){
+  let text = '🏝️ AdventureKids 冒險島 登入資訊\\n';
+  text += '─────────────────\\n';
+  text += '👤 小冒險家：' + name + '\\n';
+  text += '🔑 登入代碼：' + code + '\\n';
+  if(pin) text += '🔒 PIN：' + pin + '\\n';
+  text += '🔗 登入網址：' + url + '\\n';
+  text += '─────────────────';
+  navigator.clipboard.writeText(text.replace(/\\n/g,'\\n')).then(() => showToast('已複製所有資訊','green')).catch(() => showToast('複製失敗','red'));
+}
+
+function shareKidInfo(name, code, pin, url){
+  let text = '🏝️ AdventureKids 冒險島\\n👤 '+name+'\\n🔑 代碼：'+code;
+  if(pin) text += '\\n🔒 PIN：'+pin;
+  text += '\\n🔗 '+url;
+  if(navigator.share){
+    navigator.share({ title:'冒險島登入資訊 - '+name, text:text.replace(/\\n/g,'\\n') }).catch(()=>{});
+  } else {
+    copyKidInfo(name, code, pin, url);
+  }
+}
+
+// ─── Login Info Modal ───
+function showKidLoginInfoModal(kidId){
+  const k = familyKids.find(c => c.id===kidId);
+  if(!k){ showToast('找不到小冒險家','red'); return; }
+  const baseUrl = location.href.replace(/\/[^/]*$/,'/kid.html');
+  showModal(`
+    <div class="text-center">
+      <h3 class="text-lg font-bold mb-1">${k.avatar||'🧒'} ${k.name} 的登入資訊</h3>
+      <div class="card p-4 text-left space-y-3 mt-4 mb-4">
+        <div>
+          <p class="text-[10px] text-gray-400 mb-1">🔑 登入代碼</p>
+          <div class="bg-dark-800 rounded-lg px-4 py-2.5 font-mono text-accent-blue text-lg font-bold text-center tracking-widest">${k.kidCode||'—'}</div>
+        </div>
+        ${k.hasPin ? `<div>
+          <p class="text-[10px] text-gray-400 mb-1">🔒 PIN</p>
+          <div class="bg-dark-800 rounded-lg px-4 py-2.5 flex items-center justify-center gap-3">
+            <span id="pinDisplay" class="font-mono text-amber-400 text-lg font-bold tracking-widest">****</span>
+            <button onclick="togglePinReveal('${k.pin||''}')" class="text-gray-500 hover:text-white transition-all"><i class="ph ph-eye text-lg" id="pinEyeIcon"></i></button>
+          </div>
+        </div>` : `<div>
+          <p class="text-[10px] text-gray-400 mb-1">🔒 PIN</p>
+          <div class="bg-dark-800 rounded-lg px-4 py-2.5 text-xs text-gray-600 text-center">未設定 PIN</div>
+        </div>`}
+        <div>
+          <p class="text-[10px] text-gray-400 mb-1">🔗 登入網址</p>
+          <div class="bg-dark-800 rounded-lg px-3 py-2.5 text-xs text-gray-300 text-center break-all">${baseUrl}</div>
+        </div>
+      </div>
+      <div class="space-y-2">
+        <button onclick="copyKidInfo('${k.name}','${k.kidCode||''}','${k.pin||''}','${baseUrl}')" class="w-full bg-accent-blue text-white py-3 rounded-xl text-sm font-bold transition-all active:scale-95 hover:brightness-110">
+          <i class="ph ph-copy text-base mr-1"></i> 複製所有資訊
+        </button>
+        <button onclick="shareKidInfo('${k.name}','${k.kidCode||''}','${k.pin||''}','${baseUrl}')" class="w-full card py-3 text-sm font-bold text-accent-purple hover:text-white transition-all">
+          <i class="ph ph-share-network text-base mr-1"></i> 分享
+        </button>
+        <button onclick="closeModal()" class="w-full text-sm text-gray-500 py-2 hover:text-gray-300 transition-all">關閉</button>
+      </div>
+    </div>`, '400px');
+}
+
+let pinRevealed = false;
+function togglePinReveal(pin){
+  pinRevealed = !pinRevealed;
+  const d = document.getElementById('pinDisplay');
+  const ico = document.getElementById('pinEyeIcon');
+  if(d) d.textContent = pinRevealed ? pin : '****';
+  if(ico){ ico.classList.toggle('ph-eye', !pinRevealed); ico.classList.toggle('ph-eye-slash', pinRevealed); }
+}
+
+// ─── Edit Kid Modal ───
+function showEditKidModal(kidId){
+  const k = familyKids.find(c => c.id===kidId);
+  if(!k){ showToast('找不到小冒險家','red'); return; }
+  const hasPin = k.hasPin && k.pin;
+  showModal(`
+    <div>
+      <h3 class="text-lg font-bold mb-4 text-center">編輯小冒險家</h3>
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">名字</label>
+          <input id="ekName" type="text" maxlength="10" value="${k.name||''}" class="w-full bg-dark-800 border border-dark-600 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-accent-blue focus:outline-none transition-all"/>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 mb-2 block">頭像</label>
+          <div class="grid grid-cols-4 gap-2" id="ekAvatarGrid">
+            ${KID_AVATARS.map(e => `<button onclick="selectEditAvatar('${e}',this)" class="h-14 rounded-xl bg-dark-800 border-2 ${e===(k.avatar||'🧒')?'border-accent-blue ring-2 ring-accent-blue/30':'border-dark-600'} flex items-center justify-center text-2xl transition-all hover:border-accent-blue/50 ekAvBtn">${e}</button>`).join('')}
+          </div>
+          <input type="hidden" id="ekAvatar" value="${k.avatar||'🧒'}"/>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-xs text-gray-400">登入代碼</label>
+            <button onclick="regenerateKidCode('${kidId}')" class="text-[10px] text-accent-gold hover:text-white transition-all flex items-center gap-1"><i class="ph ph-arrows-clockwise text-xs"></i> 重新產生代碼</button>
+          </div>
+          <div class="bg-dark-800 rounded-lg px-4 py-2.5 font-mono text-accent-blue text-sm font-bold text-center tracking-widest" id="ekCodeDisplay">${k.kidCode||'—'}</div>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs text-gray-400">PIN 設定</label>
+            <button onclick="toggleEditPin()" id="ekPinToggle" class="w-10 h-5 rounded-full ${hasPin?'bg-accent-blue':'bg-dark-600'} relative transition-all cursor-pointer">
+              <span class="absolute w-4 h-4 ${hasPin?'bg-white left-5':'bg-gray-400 left-0.5'} rounded-full top-0.5 transition-all" id="ekPinDot"></span>
+            </button>
+          </div>
+          <div id="ekPinSection" class="${hasPin?'':'hidden'}">
+            <div class="flex gap-3 justify-center">
+              <input id="ekPin1" type="tel" maxlength="1" value="${hasPin?(k.pin||'')[0]||'':''}" class="w-14 h-16 bg-dark-800 border-2 border-dark-600 rounded-xl text-center text-3xl text-white font-bold focus:border-accent-blue focus:outline-none transition-all" oninput="pinAutoFocus(this,'ekPin2')"/>
+              <input id="ekPin2" type="tel" maxlength="1" value="${hasPin?(k.pin||'')[1]||'':''}" class="w-14 h-16 bg-dark-800 border-2 border-dark-600 rounded-xl text-center text-3xl text-white font-bold focus:border-accent-blue focus:outline-none transition-all" oninput="pinAutoFocus(this,'ekPin3')"/>
+              <input id="ekPin3" type="tel" maxlength="1" value="${hasPin?(k.pin||'')[2]||'':''}" class="w-14 h-16 bg-dark-800 border-2 border-dark-600 rounded-xl text-center text-3xl text-white font-bold focus:border-accent-blue focus:outline-none transition-all" oninput="pinAutoFocus(this,'ekPin4')"/>
+              <input id="ekPin4" type="tel" maxlength="1" value="${hasPin?(k.pin||'')[3]||'':''}" class="w-14 h-16 bg-dark-800 border-2 border-dark-600 rounded-xl text-center text-3xl text-white font-bold focus:border-accent-blue focus:outline-none transition-all"/>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="flex gap-2 mt-6">
+        <button onclick="closeModal()" class="flex-1 card py-3 text-sm font-bold text-gray-400 hover:text-white transition-all">取消</button>
+        <button onclick="saveKidEdit('${kidId}')" class="flex-1 bg-accent-blue text-white py-3 rounded-xl text-sm font-bold transition-all active:scale-95 hover:brightness-110">儲存變更</button>
+      </div>
+    </div>`, '440px');
+  editKidPinOn = hasPin;
+}
+
+function selectEditAvatar(emoji, btn){
+  document.getElementById('ekAvatar').value = emoji;
+  document.querySelectorAll('.ekAvBtn').forEach(b => { b.classList.remove('border-accent-blue','ring-2','ring-accent-blue/30'); b.classList.add('border-dark-600'); });
+  btn.classList.remove('border-dark-600'); btn.classList.add('border-accent-blue','ring-2','ring-accent-blue/30');
+}
+
+let editKidPinOn = false;
+function toggleEditPin(){
+  editKidPinOn = !editKidPinOn;
+  const sec = document.getElementById('ekPinSection');
+  const tog = document.getElementById('ekPinToggle');
+  const dot = document.getElementById('ekPinDot');
+  if(editKidPinOn){
+    sec.classList.remove('hidden');
+    tog.classList.remove('bg-dark-600'); tog.classList.add('bg-accent-blue');
+    dot.classList.remove('left-0.5','bg-gray-400'); dot.classList.add('left-5','bg-white');
+  } else {
+    sec.classList.add('hidden');
+    tog.classList.remove('bg-accent-blue'); tog.classList.add('bg-dark-600');
+    dot.classList.remove('left-5','bg-white'); dot.classList.add('left-0.5','bg-gray-400');
+  }
+}
+
+async function regenerateKidCode(kidId){
+  showModal(`
+    <div class="text-center">
+      <div class="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto mb-3">
+        <i class="ph-fill ph-warning text-amber-400 text-3xl"></i>
+      </div>
+      <h3 class="text-lg font-bold mb-2">重新產生代碼？</h3>
+      <p class="text-sm text-gray-400 mb-6">舊代碼會立即失效，你需要重新告知小冒險家新的登入代碼。</p>
+      <div class="flex gap-2">
+        <button onclick="showEditKidModal('${kidId}')" class="flex-1 card py-3 text-sm font-bold text-gray-400 hover:text-white transition-all">取消</button>
+        <button onclick="confirmRegenerateCode('${kidId}')" class="flex-1 bg-accent-gold text-dark-900 py-3 rounded-xl text-sm font-bold transition-all active:scale-95 hover:brightness-110">確認重新產生</button>
+      </div>
+    </div>`, '380px');
+}
+
+async function confirmRegenerateCode(kidId){
+  try {
+    const newCode = await generateKidCode();
+    await db.collection('users').doc(kidId).update({ kidCode: newCode });
+    showToast('代碼已更新：'+newCode,'green');
+    showEditKidModal(kidId);
+  } catch(e){ showToast('更新失敗：'+e.message,'red'); }
+}
+
+async function saveKidEdit(kidId){
+  const name = (document.getElementById('ekName')?.value||'').trim();
+  const avatar = document.getElementById('ekAvatar')?.value || '🧒';
+  if(!name){ showToast('請輸入名字','gold'); return; }
+  let pin = null;
+  if(editKidPinOn){
+    const p1=document.getElementById('ekPin1')?.value||'';
+    const p2=document.getElementById('ekPin2')?.value||'';
+    const p3=document.getElementById('ekPin3')?.value||'';
+    const p4=document.getElementById('ekPin4')?.value||'';
+    pin = p1+p2+p3+p4;
+    if(pin.length!==4){ showToast('請輸入完整 4 位 PIN','gold'); return; }
+  }
+  try {
+    await db.collection('users').doc(kidId).update({
+      name: name, avatar: avatar, pin: pin, hasPin: !!pin
+    });
+    cacheSet('user_'+kidId, null);
+    closeModal();
+    showToast('已儲存變更','green');
+  } catch(e){ showToast('儲存失敗：'+e.message,'red'); }
+}
+
+// ─── Delete Kid Modal ───
+function showDeleteKidModal(kidId){
+  const k = familyKids.find(c => c.id===kidId);
+  if(!k){ showToast('找不到小冒險家','red'); return; }
+  showModal(`
+    <div class="text-center">
+      <div class="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-3">
+        <i class="ph-fill ph-warning text-red-400 text-3xl"></i>
+      </div>
+      <h3 class="text-lg font-bold mb-2">刪除小冒險家？</h3>
+      <p class="text-sm text-gray-400 mb-1">即將刪除 <b class="text-white">${k.avatar||'🧒'} ${k.name}</b> 的所有資料</p>
+      <p class="text-xs text-red-400/80 mb-4">此操作無法復原，包含任務與兌換紀錄都會一併刪除。</p>
+      <div class="mb-4">
+        <p class="text-xs text-gray-500 mb-2">請輸入「<b class="text-white">${k.name}</b>」確認刪除</p>
+        <input id="dkConfirm" type="text" placeholder="${k.name}" class="w-full bg-dark-800 border border-dark-600 rounded-xl px-4 py-3 text-sm text-white text-center placeholder-gray-700 focus:border-red-400 focus:outline-none transition-all" oninput="checkDeleteConfirm('${k.name}')"/>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="closeModal()" class="flex-1 card py-3 text-sm font-bold text-gray-400 hover:text-white transition-all">取消</button>
+        <button id="dkDeleteBtn" onclick="confirmDeleteKid('${kidId}')" disabled class="flex-1 bg-red-500/30 text-red-300 py-3 rounded-xl text-sm font-bold transition-all opacity-50 cursor-not-allowed">確認刪除</button>
+      </div>
+    </div>`, '400px');
+}
+
+function checkDeleteConfirm(name){
+  const val = (document.getElementById('dkConfirm')?.value||'').trim();
+  const btn = document.getElementById('dkDeleteBtn');
+  if(!btn) return;
+  if(val===name){
+    btn.disabled = false;
+    btn.classList.remove('opacity-50','cursor-not-allowed','bg-red-500/30');
+    btn.classList.add('bg-red-500','active:scale-95','hover:brightness-110');
+  } else {
+    btn.disabled = true;
+    btn.classList.add('opacity-50','cursor-not-allowed','bg-red-500/30');
+    btn.classList.remove('bg-red-500','active:scale-95','hover:brightness-110');
+  }
+}
+
+async function confirmDeleteKid(kidId){
+  try {
+    showToast('刪除中...','blue');
+    const famRef = db.collection('families').doc(userFamily.id);
+    // Delete related tasks
+    const taskSnap = await famRef.collection('tasks').where('assignedTo','==',kidId).get();
+    const batch1 = db.batch();
+    taskSnap.forEach(d => batch1.delete(d.ref));
+    if(!taskSnap.empty) await batch1.commit();
+    // Delete related redemptions
+    const redSnap = await famRef.collection('redemptions').where('userId','==',kidId).get();
+    const batch2 = db.batch();
+    redSnap.forEach(d => batch2.delete(d.ref));
+    if(!redSnap.empty) await batch2.commit();
+    // Remove from family members
+    await famRef.update({ members: firebase.firestore.FieldValue.arrayRemove(kidId) });
+    // Delete user doc
+    await db.collection('users').doc(kidId).delete();
+    cacheClear('family_'+userFamily.id);
+    cacheSet('user_'+kidId, null);
+    closeModal();
+    showToast('已刪除小冒險家','green');
+  } catch(e){ console.error('deleteKid error:', e); showToast('刪除失敗：'+e.message,'red'); }
+}
+
+// ══════════════════════════════════════
+// Kid Pages
+// ══════════════════════════════════════
 function kidHome(){
   const coins = currentUser?.coins || 0;
   const petEXP = currentUser?.petEXP || 0;
