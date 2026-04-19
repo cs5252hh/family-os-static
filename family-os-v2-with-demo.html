@@ -575,6 +575,47 @@ async function ensureDemoData(){
         cacheClear('family_demo-family');
       }
     }
+    // 確保 demo 有兌換紀錄（展示票券功能）
+    const famRef = db.collection('families').doc('demo-family');
+    const rSnap = await famRef.collection('redemptions').limit(1).get();
+    if(rSnap.empty){
+      fsLog('writes', 'auto-create demo redemptions');
+      const now = firebase.firestore.Timestamp.now();
+      const ago = (h) => new firebase.firestore.Timestamp(now.seconds - h*3600, 0);
+      const batch = db.batch();
+      // pending（審核中）
+      batch.set(famRef.collection('redemptions').doc('demo-r1'), {
+        rewardId:'demo-rw1', rewardTitle:'週末打電動 1 小時', rewardEmoji:'🎮', cost:30,
+        userId:'demo-kid1', status:'pending', appliedAt:ago(2)
+      });
+      batch.set(famRef.collection('redemptions').doc('demo-r2'), {
+        rewardId:'demo-rw2', rewardTitle:'選一部電影看', rewardEmoji:'🎬', cost:25,
+        userId:'demo-kid1', status:'pending', appliedAt:ago(5)
+      });
+      // approved（已核准、可使用）
+      batch.set(famRef.collection('redemptions').doc('demo-r3'), {
+        rewardId:'demo-rw3', rewardTitle:'去公園玩 1 小時', rewardEmoji:'🏖️', cost:20,
+        userId:'demo-kid1', status:'approved', appliedAt:ago(48),
+        reviewedAt:ago(24), reviewedBy:'demo-captain'
+      });
+      batch.set(famRef.collection('redemptions').doc('demo-r4'), {
+        rewardId:'demo-rw4', rewardTitle:'買一個小玩具', rewardEmoji:'🧸', cost:50,
+        userId:'demo-kid1', status:'approved', appliedAt:ago(72),
+        reviewedAt:ago(48), reviewedBy:'demo-captain'
+      });
+      // used + rejected（歷程用）
+      batch.set(famRef.collection('redemptions').doc('demo-r5'), {
+        rewardId:'demo-rw5', rewardTitle:'吃冰淇淋', rewardEmoji:'🍦', cost:15,
+        userId:'demo-kid1', status:'used', appliedAt:ago(168),
+        reviewedAt:ago(160), usedAt:ago(144), reviewedBy:'demo-captain'
+      });
+      batch.set(famRef.collection('redemptions').doc('demo-r6'), {
+        rewardId:'demo-rw6', rewardTitle:'買遊戲點數', rewardEmoji:'💎', cost:100,
+        userId:'demo-kid1', status:'rejected', appliedAt:ago(240),
+        reviewedAt:ago(200), reviewedBy:'demo-captain'
+      });
+      await batch.commit();
+    }
   } catch(e){ console.warn('ensureDemoData:', e); }
 }
 
@@ -1760,7 +1801,7 @@ function kidRewardsTab(){
           </div>
           <div class="flex-1 min-w-0">
             <p class="font-semibold text-white text-sm">${r.rewardTitle||'獎勵'}</p>
-            <p class="text-[10px] text-gray-600 mt-0.5">${ago}申請 · ${r.cost||0} 🐚</p>
+            <p class="text-[10px] text-gray-600 mt-0.5">${ago ? ago.replace('前','')+'前申請' : '申請中'} · ${r.cost||0} 🐚</p>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             <span class="badge text-[9px] text-orange-400 bg-orange-500/10 border border-orange-500/20">審核中</span>
@@ -1782,7 +1823,7 @@ function kidRewardsTab(){
           </div>
           <div class="flex-1 min-w-0">
             <p class="font-semibold text-white">${r.rewardTitle||'獎勵'}</p>
-            <p class="text-[10px] text-gray-600 mt-0.5"><i class="ph ph-check-circle text-accent-green mr-0.5"></i>核准於 ${ago}前</p>
+            <p class="text-[10px] text-gray-600 mt-0.5"><i class="ph ph-check-circle text-accent-green mr-0.5"></i>核准於 ${ago||'不久前'}</p>
           </div>
           <button onclick="vibrate(10);showUseTicketModal('${r.id}','${(r.rewardTitle||'').replace(/'/g,"\\\\'")}','${r.rewardEmoji||''}')" class="bg-accent-gold text-dark-900 px-4 h-9 rounded-xl text-xs font-bold transition-all active:scale-90 hover:brightness-110 shrink-0">使用</button>
         </div>`;
@@ -2386,7 +2427,7 @@ function kidHistory(){
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-sm font-semibold text-white truncate">${r.rewardTitle||'獎勵'}</p>
-              <p class="text-[10px] text-gray-600">於 ${ago}前使用 · ${r.cost||0} 🐚</p>
+              <p class="text-[10px] text-gray-600">於 ${ago||'不久前'}使用 · ${r.cost||0} 🐚</p>
             </div>
             <span class="badge text-[9px] text-accent-green bg-accent-green/10">已使用 ✓</span>
           </div>`;
@@ -2404,7 +2445,7 @@ function kidHistory(){
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-sm font-semibold text-gray-400 truncate">${r.rewardTitle||'獎勵'}</p>
-              <p class="text-[10px] text-gray-600">於 ${ago}前駁回 · ${r.cost||0} 🐚 已退還</p>
+              <p class="text-[10px] text-gray-600">於 ${ago||'不久前'}駁回 · ${r.cost||0} 🐚 已退還</p>
             </div>
             <span class="badge text-[9px] text-gray-500 bg-dark-700">已駁回 ✗</span>
           </div>`;
