@@ -288,6 +288,49 @@ let rewardTab = 0;   // 0=待審核, 1=獎勵管理, 2=兌換紀錄
 let taskTab = 0;     // 0=待審核, 1=任務管理, 2=已完成
 let historyFilter = '全部';  // 全部 / approved / rejected
 let historySort = 'newest';  // newest / oldest
+let reminderTab = 0;         // 0=新增提醒, 1=提醒清單
+let reminderTemplateCat = '早晨';
+
+const REMINDER_TEMPLATES = [
+  // 早晨
+  {emoji:'🦷',msg:'記得刷牙洗臉，保持笑容亮晶晶',cat:'早晨'},
+  {emoji:'🍳',msg:'早餐要吃飽，今天才有力氣冒險',cat:'早晨'},
+  {emoji:'🎒',msg:'出門前檢查書包有沒有忘記東西',cat:'早晨'},
+  {emoji:'☀️',msg:'早安寶貝，新的一天充滿可能性',cat:'早晨'},
+  {emoji:'🌧️',msg:'今天會下雨，記得帶雨具',cat:'早晨'},
+  // 學習
+  {emoji:'📖',msg:'學新東西很棒，但休息也很重要',cat:'學習'},
+  {emoji:'✏️',msg:'字寫慢一點沒關係，整齊最重要',cat:'學習'},
+  {emoji:'🤔',msg:'不會的就問，問問題是聰明人才會做的事',cat:'學習'},
+  {emoji:'🎯',msg:'一次專心做一件事，效果最好',cat:'學習'},
+  {emoji:'💡',msg:'今天學到什麼新東西，記得跟我分享',cat:'學習'},
+  // 情緒
+  {emoji:'🤗',msg:'不開心可以告訴爸爸媽媽，我會聽你說',cat:'情緒'},
+  {emoji:'😌',msg:'深呼吸，慢慢來，沒事的',cat:'情緒'},
+  {emoji:'💪',msg:'失敗沒關係，再試一次就好',cat:'情緒'},
+  {emoji:'🌈',msg:'今天的你超棒的，我以你為榮',cat:'情緒'},
+  {emoji:'🥰',msg:'爸爸媽媽很愛你，永遠都是',cat:'情緒'},
+  // 健康
+  {emoji:'🚴',msg:'多動一動，身體才會強壯',cat:'健康'},
+  {emoji:'💧',msg:'記得多喝水，今天要喝滿 8 杯',cat:'健康'},
+  {emoji:'🥗',msg:'蔬菜也要吃，眼睛才會亮晶晶',cat:'健康'},
+  {emoji:'😴',msg:'早點睡，明天才有精神冒險',cat:'健康'},
+  {emoji:'🧘',msg:'累了就休息，不要硬撐',cat:'健康'},
+  // 人際
+  {emoji:'👋',msg:'今天記得跟同學打招呼',cat:'人際'},
+  {emoji:'🤲',msg:'主動幫助別人會讓自己更快樂',cat:'人際'},
+  {emoji:'🙏',msg:'謝謝、對不起、請，都很重要',cat:'人際'},
+  {emoji:'👫',msg:'朋友吵架沒關係，和好就是新的開始',cat:'人際'},
+  {emoji:'💝',msg:'想念誰可以打電話，不要憋在心裡',cat:'人際'},
+  // 睡前
+  {emoji:'🌟',msg:'今天最棒的一件事是什麼？',cat:'睡前'},
+  {emoji:'📚',msg:'睡前一起讀本書好嗎？',cat:'睡前'},
+  {emoji:'🛌',msg:'玩具收好，明天才找得到',cat:'睡前'},
+  {emoji:'🌙',msg:'晚安寶貝，做個好夢',cat:'睡前'},
+  {emoji:'🤗',msg:'爸爸媽媽明天還會在這裡',cat:'睡前'},
+];
+const REMINDER_CATS = ['早晨','學習','情緒','健康','人際','睡前'];
+const REMINDER_CAT_EMOJIS = {'早晨':'🌅','學習':'📚','情緒':'❤️','健康':'🏃','人際':'🤝','睡前':'🌙'};
 
 const REWARD_CAT_ICONS = {
   '全部':'ph-squares-four','娛樂':'ph-game-controller','美食':'ph-cookie',
@@ -873,8 +916,28 @@ function switchPage(pageId){
 }
 function switchRewardTab(idx){ rewardTab=idx; renderPage(); }
 function switchTaskTab(idx){ taskTab=idx; renderPage(); }
+function switchReminderTab(idx){ reminderTab=idx; renderPage(); }
 function setHistoryFilter(f){ historyFilter=f; renderPage(); }
 function setHistorySort(s){ historySort=s; renderPage(); }
+function setReminderCat(c){ reminderTemplateCat=c; renderPage(); }
+function applyReminderTemplate(emoji, msg){
+  const activeCount = familyData.reminders.filter(r => r.isActive!==false).length;
+  if(activeCount>=10){ showToast('啟用中的提醒已達 10 條上限，請先停用或刪除舊提醒','gold'); return; }
+  const eI=document.getElementById('sEmoji');
+  const tI=document.getElementById('noticeText');
+  const pE=document.getElementById('pEmoji');
+  const pT=document.getElementById('pText');
+  if(eI) eI.value=emoji;
+  if(tI) tI.value=msg;
+  if(pE) pE.textContent=emoji;
+  if(pT) pT.textContent=msg;
+  // highlight the selected emoji button
+  document.querySelectorAll('.ebtn').forEach(b => {
+    b.classList.remove('ring-2','ring-accent-blue');
+    if(b.textContent.trim()===emoji) b.classList.add('ring-2','ring-accent-blue');
+  });
+  showToast(`<span class="mr-1">${emoji}</span> 已套用模板`,'blue');
+}
 
 function updateNavActive(){
   const ns = userRole === 'captain' ? NAV_CAPTAIN : NAV_KID;
@@ -1278,53 +1341,125 @@ function captainRewards(){
 // ══════════════════════════════════════
 // Captain: Reminders
 // ══════════════════════════════════════
-function captainReminders(){
-  const emojis = ['💡','❤️','⭐','🙏','😊','🎯','📚','🌈','💛','🎵','🦆','💬','🤝','🏃','🌸','🚀','🔥','🏆','🎨','🌟'];
-  return `<div class="space-y-5">
-    <div class="card p-5">
-      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-4">+ 新增貼心提醒</p>
-      <div class="mb-4">
-        <p class="text-xs text-gray-500 mb-2">選擇 Emoji</p>
-        <div class="flex flex-wrap gap-2">
-          ${emojis.map((e,i) => `
-          <button onclick="document.querySelectorAll('.ebtn').forEach(b=>b.classList.remove('ring-2','ring-accent-blue'));this.classList.add('ring-2','ring-accent-blue');document.getElementById('sEmoji').value='${e}';var p=document.getElementById('pEmoji');if(p)p.textContent='${e}'"
-            class="ebtn w-10 h-10 rounded-xl bg-dark-700 flex items-center justify-center text-xl transition-all active:scale-90 hover:bg-dark-600 ${i===0?'ring-2 ring-accent-blue':''}">${e}</button>`).join('')}
-        </div>
-        <input id="sEmoji" type="hidden" value="${emojis[0]}">
-      </div>
-      <div class="mb-4">
-        <p class="text-xs text-gray-500 mb-2">提醒內容</p>
-        <textarea id="noticeText" rows="2" placeholder="例：今天要記得跟同學打招呼！"
-          oninput="var p=document.getElementById('pText');if(p)p.textContent=this.value||'輸入提醒內容…'"
-          class="w-full border rounded-xl px-4 py-3 text-sm resize-none"></textarea>
-      </div>
-      <div class="rounded-xl p-3 mb-4 flex items-center gap-3" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25)">
-        <span class="text-2xl shrink-0" id="pEmoji">${emojis[0]}</span>
-        <div>
-          <p class="text-[10px] text-accent-blue font-bold mb-0.5">孩子看到的效果</p>
-          <p class="text-sm text-white" id="pText">輸入提醒內容…</p>
-        </div>
-      </div>
-      <button onclick="vibrate(10);addReminder()" class="w-full bg-accent-blue text-white py-3 rounded-xl text-sm font-bold transition-all active:scale-95 hover:brightness-110">確認新增</button>
-    </div>
+function timeAgo(ts){
+  if(!ts) return '';
+  const now = Date.now();
+  const t = ts.seconds ? ts.seconds*1000 : ts;
+  const diff = now - t;
+  const mins = Math.floor(diff/60000);
+  if(mins<1) return '剛剛';
+  if(mins<60) return mins+' 分鐘前';
+  const hrs = Math.floor(mins/60);
+  if(hrs<24) return hrs+' 小時前';
+  const days = Math.floor(hrs/24);
+  if(days<30) return days+' 天前';
+  const months = Math.floor(days/30);
+  return months+' 個月前';
+}
 
-    <div>
-      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">目前提醒清單（${familyData.reminders.length} 條）</p>
-      ${familyData.reminders.length>0?`
-      <div class="space-y-2">${familyData.reminders.map(n => `
-        <div class="card p-4 flex items-center gap-3">
-          <span class="text-2xl shrink-0">${n.emoji||'💡'}</span>
-          <p class="flex-1 text-sm text-gray-200">${n.message||''}</p>
-          <button onclick="vibrate(8);deleteReminder('${n.id}')" class="text-[10px] text-red-400 bg-red-400/10 px-3 py-1.5 rounded-lg font-bold transition-all active:scale-90 hover:bg-red-400/20 shrink-0">刪除</button>
-        </div>`).join('')}
-      </div>`:`
-      <div class="card p-8 text-center">
-        <i class="ph-fill ph-bell-slash text-3xl text-gray-600 mb-3 block"></i>
-        <p class="text-gray-500 text-sm">還沒有提醒</p>
-        <p class="text-gray-600 text-xs mt-1">新增一條貼心話給孩子吧</p>
-      </div>`}
+function reminderListCard(n){
+  const active = n.isActive !== false;
+  return `<div class="card p-4 ${active?'':'opacity-50'}">
+    <div class="flex items-center gap-3">
+      <span class="text-2xl shrink-0">${n.emoji||'💡'}</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm ${active?'text-gray-200':'text-gray-500 line-through'}">${n.message||''}</p>
+        <p class="text-[10px] text-gray-600 mt-0.5">${timeAgo(n.createdAt)}</p>
+      </div>
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button onclick="vibrate(5);toggleReminder('${n.id}',${active?'false':'true'})" class="w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 ${active?'bg-accent-green/10 text-accent-green hover:bg-accent-green/20':'bg-dark-700 text-gray-600 hover:text-gray-400'}" title="${active?'停用':'啟用'}">
+          <i class="ph ${active?'ph-toggle-right':'ph-toggle-left'} text-lg"></i>
+        </button>
+        <button onclick="vibrate(5);showEditReminderModal('${n.id}')" class="bg-dark-700 text-accent-blue w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 hover:bg-accent-blue/10" title="編輯"><i class="ph ph-pencil-simple text-sm"></i></button>
+        <button onclick="vibrate(5);deleteReminder('${n.id}')" class="bg-dark-700 text-red-400 w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 hover:bg-red-400/10" title="刪除"><i class="ph ph-trash text-sm"></i></button>
+      </div>
     </div>
   </div>`;
+}
+
+function captainReminders(){
+  const emojis = ['💡','❤️','⭐','🙏','😊','🎯','📚','🌈','💛','🎵','🦆','💬','🤝','🏃','🌸','🚀','🔥','🏆','🎨','🌟','🦷','🍳','🎒','☀️','🌧️','📖','✏️','🤔','🎯','💡','🤗','😌','💪','🌈','🥰','🚴','💧','🥗','😴','🧘','👋','🤲','👫','💝','🌟','🛌','🌙'];
+  const uniqueEmojis = [...new Set(emojis)];
+  const activeCount = familyData.reminders.filter(r => r.isActive!==false).length;
+  const totalCount = familyData.reminders.length;
+  const atLimit = activeCount >= 10;
+  const sorted = [...familyData.reminders].sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+  const filtered = REMINDER_TEMPLATES.filter(t => t.cat===reminderTemplateCat);
+
+  const tabs = [
+    {emoji:'📝', label:'新增提醒', count:null},
+    {emoji:'📋', label:'提醒清單', count:null},
+  ];
+  // Custom count display for tab 2
+  const tabsHtml = `<div class="tab-bar mb-4">
+    <button onclick="switchReminderTab(0)" class="tab-btn ${reminderTab===0?'active':''}">📝 新增提醒</button>
+    <button onclick="switchReminderTab(1)" class="tab-btn ${reminderTab===1?'active':''}">📋 提醒清單<span class="tab-badge">${activeCount}/${totalCount}</span></button>
+  </div>`;
+
+  let content = '';
+
+  if(reminderTab===0){
+    // Tab 1: 新增提醒
+    content = `<div class="tab-content space-y-4">
+      ${atLimit?`<div class="rounded-xl p-3 flex items-center gap-2" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25)">
+        <i class="ph ph-warning text-accent-gold text-lg"></i>
+        <p class="text-xs text-accent-gold">啟用中的提醒已達 <b>10 條上限</b>，請先停用或刪除舊提醒</p>
+      </div>`:''}
+      <div class="card p-4">
+        <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">常用提醒模板</p>
+        <div class="flex gap-1.5 mb-3 overflow-x-auto pb-1" style="-webkit-overflow-scrolling:touch;">
+          ${REMINDER_CATS.map(c => `<button onclick="setReminderCat('${c}')" class="shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${reminderTemplateCat===c?'bg-accent-blue text-white':'bg-dark-700 text-gray-400 hover:text-white'}">
+            ${REMINDER_CAT_EMOJIS[c]||''} ${c}
+          </button>`).join('')}
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
+          ${filtered.map(t => `<button onclick="${atLimit?'':`applyReminderTemplate('${t.emoji}',\`${t.msg.replace(/`/g,"'")}\`)`}" class="card p-3 text-left transition-all ${atLimit?'opacity-40 cursor-not-allowed':'active:scale-95 hover:border-accent-blue/50'} flex items-start gap-2.5">
+            <span class="text-xl shrink-0 mt-0.5">${t.emoji}</span>
+            <p class="text-xs text-gray-300 leading-relaxed line-clamp-2">${t.msg}</p>
+          </button>`).join('')}
+        </div>
+      </div>
+      <div class="card p-4">
+        <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">自訂提醒</p>
+        <div class="mb-3">
+          <p class="text-xs text-gray-500 mb-2">選擇 Emoji</p>
+          <div class="flex flex-wrap gap-2">
+            ${uniqueEmojis.map((e,i) => `
+            <button onclick="document.querySelectorAll('.ebtn').forEach(b=>b.classList.remove('ring-2','ring-accent-blue'));this.classList.add('ring-2','ring-accent-blue');document.getElementById('sEmoji').value='${e}';var p=document.getElementById('pEmoji');if(p)p.textContent='${e}'"
+              class="ebtn w-9 h-9 rounded-lg bg-dark-700 flex items-center justify-center text-lg transition-all active:scale-90 hover:bg-dark-600 ${i===0?'ring-2 ring-accent-blue':''}">${e}</button>`).join('')}
+          </div>
+          <input id="sEmoji" type="hidden" value="${uniqueEmojis[0]}">
+        </div>
+        <div class="mb-3">
+          <p class="text-xs text-gray-500 mb-2">提醒內容</p>
+          <textarea id="noticeText" rows="2" placeholder="例：今天要記得跟同學打招呼！"
+            oninput="var p=document.getElementById('pText');if(p)p.textContent=this.value||'輸入提醒內容…'"
+            class="w-full border rounded-xl px-4 py-3 text-sm resize-none"></textarea>
+        </div>
+        <div class="rounded-xl p-3 mb-3 flex items-center gap-3" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25)">
+          <span class="text-2xl shrink-0" id="pEmoji">${uniqueEmojis[0]}</span>
+          <div>
+            <p class="text-[10px] text-accent-blue font-bold mb-0.5">孩子看到的效果</p>
+            <p class="text-sm text-white" id="pText">輸入提醒內容…</p>
+          </div>
+        </div>
+        <button onclick="vibrate(10);addReminder()" class="w-full bg-accent-blue text-white py-3 rounded-xl text-sm font-bold transition-all active:scale-95 hover:brightness-110 flex items-center justify-center gap-1 ${atLimit?'opacity-50 cursor-not-allowed':''}" ${atLimit?'disabled':''}>
+          <i class="ph ph-bell-ringing"></i> 確認新增
+        </button>
+      </div>
+    </div>`;
+  } else {
+    // Tab 2: 提醒清單
+    content = `<div class="tab-content">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-xs text-gray-500">啟用 <span class="${activeCount>=10?'text-red-400':'text-accent-green'} font-bold">${activeCount}</span> / ${totalCount} 條（上限 10）</p>
+      </div>
+      ${sorted.length>0?`<div class="space-y-2">${sorted.map(n => reminderListCard(n)).join('')}</div>`
+      :empty('ph-bell-slash','還沒有提醒','新增一條貼心話給孩子吧','新增提醒','switchReminderTab(0)')}
+    </div>`;
+  }
+
+  return `<div>${tabsHtml}${content}</div>`;
 }
 
 // ══════════════════════════════════════
@@ -1946,6 +2081,8 @@ async function addReminder(){
   const message = document.getElementById('noticeText')?.value.trim();
   const emoji = document.getElementById('sEmoji')?.value || '💡';
   if(!message){ showToast('請輸入提醒內容','gold'); return; }
+  const activeCount = familyData.reminders.filter(r => r.isActive!==false).length;
+  if(activeCount>=10){ showToast('啟用中的提醒已達 10 條上限','gold'); return; }
   try {
     fsLog('writes', 'addReminder');
     await db.collection('families').doc(userFamily.id).collection('reminders').add({
@@ -1953,15 +2090,81 @@ async function addReminder(){
       createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: liffUserId
     });
     showToast('<i class="ph-fill ph-bell-ringing mr-1"></i> 提醒已新增！','green');
+    // clear form
+    const tI=document.getElementById('noticeText'); if(tI) tI.value='';
+    const pT=document.getElementById('pText'); if(pT) pT.textContent='輸入提醒內容…';
   } catch(e){ console.error('新增提醒失敗:', e); showToast('新增失敗','red'); }
 }
 
 async function deleteReminder(id){
+  const r = familyData.reminders.find(r => r.id===id);
+  if(r && !confirm(`確定要刪除「${r.message?.substring(0,15)||''}…」？`)) return;
   try {
     fsLog('writes', 'deleteReminder');
     await db.collection('families').doc(userFamily.id).collection('reminders').doc(id).delete();
-    showToast('已刪除提醒','red');
+    showToast('<i class="ph ph-trash mr-1"></i> 已刪除提醒','red');
   } catch(e){ console.error('刪除提醒失敗:', e); showToast('刪除失敗','red'); }
+}
+
+async function toggleReminder(id, newState){
+  try {
+    fsLog('writes', 'toggleReminder');
+    if(newState && familyData.reminders.filter(r => r.isActive!==false && r.id!==id).length>=10){
+      showToast('啟用中的提醒已達 10 條上限','gold'); return;
+    }
+    await db.collection('families').doc(userFamily.id).collection('reminders').doc(id).update({
+      isActive: newState
+    });
+    showToast(newState?'<i class="ph ph-toggle-right mr-1"></i> 提醒已啟用':'<i class="ph ph-toggle-left mr-1"></i> 提醒已停用', newState?'green':'gold');
+  } catch(e){ console.error('切換提醒失敗:', e); showToast('操作失敗','red'); }
+}
+
+function showEditReminderModal(id){
+  const n = familyData.reminders.find(r => r.id===id);
+  if(!n) return;
+  const emojis = ['💡','❤️','⭐','🙏','😊','🎯','📚','🌈','💛','🎵','🦆','💬','🤝','🏃','🌸','🚀','🔥','🏆','🎨','🌟','🦷','🍳','🎒','☀️','🌧️','📖','✏️','🤔','😌','💪','🥰','🚴','💧','🥗','😴','🧘','👋','🤲','👫','💝','🛌','🌙','🤗'];
+  const uniqueE = [...new Set(emojis)];
+  showModal(`
+    <h3 class="text-base font-bold text-white mb-4"><i class="ph ph-pencil-simple mr-1"></i>編輯提醒</h3>
+    <div class="space-y-3">
+      <div>
+        <p class="text-xs text-gray-500 mb-2">選擇 Emoji</p>
+        <div class="flex flex-wrap gap-1.5">
+          ${uniqueE.map(e => `<button onclick="document.querySelectorAll('.eebtn').forEach(b=>b.classList.remove('ring-2','ring-accent-blue'));this.classList.add('ring-2','ring-accent-blue');document.getElementById('erEmoji').value='${e}';document.getElementById('erPreviewE').textContent='${e}'"
+            class="eebtn w-8 h-8 rounded-lg bg-dark-700 flex items-center justify-center text-base transition-all active:scale-90 hover:bg-dark-600 ${e===(n.emoji||'💡')?'ring-2 ring-accent-blue':''}">${e}</button>`).join('')}
+        </div>
+        <input id="erEmoji" type="hidden" value="${n.emoji||'💡'}">
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 mb-2">提醒內容</p>
+        <textarea id="erMsg" rows="2" class="w-full border rounded-xl px-4 py-3 text-sm resize-none"
+          oninput="document.getElementById('erPreviewT').textContent=this.value||'…'">${n.message||''}</textarea>
+      </div>
+      <div class="rounded-xl p-3 flex items-center gap-3" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25)">
+        <span class="text-2xl shrink-0" id="erPreviewE">${n.emoji||'💡'}</span>
+        <div>
+          <p class="text-[10px] text-accent-blue font-bold mb-0.5">預覽</p>
+          <p class="text-sm text-white" id="erPreviewT">${n.message||''}</p>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="closeModal()" class="flex-1 bg-dark-700 text-gray-400 py-3 rounded-xl text-sm font-bold">取消</button>
+        <button onclick="vibrate(8);editReminder('${id}')" class="flex-1 bg-accent-blue text-white py-3 rounded-xl text-sm font-bold transition-all active:scale-95"><i class="ph ph-check mr-1"></i>儲存</button>
+      </div>
+    </div>`, '480px');
+}
+
+async function editReminder(id){
+  const msg = document.getElementById('erMsg')?.value.trim();
+  const emoji = document.getElementById('erEmoji')?.value || '💡';
+  if(!msg){ showToast('請輸入提醒內容','gold'); return; }
+  try {
+    fsLog('writes', 'editReminder');
+    await db.collection('families').doc(userFamily.id).collection('reminders').doc(id).update({
+      emoji, message: msg
+    });
+    closeModal(); showToast('<i class="ph-fill ph-check-circle mr-1"></i> 提醒已更新！','green');
+  } catch(e){ console.error('編輯提醒失敗:', e); showToast('編輯失敗','red'); }
 }
 
 function copyInviteCode(){
