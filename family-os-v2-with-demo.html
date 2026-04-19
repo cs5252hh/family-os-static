@@ -220,8 +220,26 @@ const CAT_COLORS = {
   娛樂:'text-cyan-400 bg-cyan-400/10',
   購物:'text-orange-400 bg-orange-400/10',
   家庭:'text-red-400 bg-red-400/10',
+  健康:'text-cyan-400 bg-cyan-400/10',
+  創意:'text-pink-400 bg-pink-400/10',
+  關懷:'text-red-400 bg-red-400/10',
   其他:'text-gray-400 bg-dark-700',
 };
+
+const TASK_TEMPLATES = [
+  {emoji:'📚',title:'寫功課',      cat:'學習',pts:10},
+  {emoji:'📖',title:'閱讀 30 分鐘',cat:'學習',pts:15},
+  {emoji:'🪥',title:'刷牙洗臉',    cat:'健康',pts:5},
+  {emoji:'🛏️',title:'整理床鋪',    cat:'家事',pts:5},
+  {emoji:'🧹',title:'收拾玩具',    cat:'家事',pts:5},
+  {emoji:'🍱',title:'飯後幫忙收碗',cat:'家事',pts:10},
+  {emoji:'🏃',title:'運動 20 分鐘',cat:'運動',pts:15},
+  {emoji:'🎨',title:'畫一張畫',    cat:'創意',pts:10},
+  {emoji:'🎹',title:'練樂器 15 分鐘',cat:'創意',pts:15},
+  {emoji:'💝',title:'主動關心家人',cat:'關懷',pts:10},
+  {emoji:'🌱',title:'幫忙澆花',    cat:'家事',pts:5},
+  {emoji:'🐕',title:'幫忙照顧寵物',cat:'關懷',pts:10},
+];
 
 const ACHIEVEMENTS = [
   {id:'a1',title:'初出茅廬',  desc:'完成第一個任務',   icon:'ph-star',           threshold:1,  type:'task_count'},
@@ -305,7 +323,14 @@ function getPetStage(petEXP){
 }
 
 function getMemberName(userId){
+  if(Array.isArray(userId)) return userId.map(id => familyData.members[id]?.name || '未知').join('、');
   return familyData.members[userId]?.name || '未知用戶';
+}
+
+// assignedTo 相容函數：支援字串或陣列
+function taskIsFor(task, userId){
+  if(Array.isArray(task.assignedTo)) return task.assignedTo.includes(userId);
+  return task.assignedTo === userId;
 }
 
 function updateLoadingText(text){
@@ -400,7 +425,37 @@ async function enterDemoMode(role){
       <p class="text-lg font-medium">🌊 載入${role === 'captain' ? '船長' : role === 'kid2' ? '小美' : '小明'}模式...</p>
       <p id="loadingText" class="text-sm text-gray-400 mt-2">正在連接資料庫...</p>
     </div>`;
+  // 自動確保 demo 資料存在
+  await ensureDemoData();
   await checkUserSetup();
+}
+
+// 確保 demo-family 包含 demo-kid2
+async function ensureDemoData(){
+  try {
+    const kid2Doc = await db.collection('users').doc('demo-kid2').get();
+    if(!kid2Doc.exists){
+      fsLog('writes', 'auto-create demo-kid2');
+      await db.collection('users').doc('demo-kid2').set({
+        familyId: 'demo-family', role: 'kid', name: '小美',
+        coins: 0, petEXP: 0, streak: 0,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        lastActiveAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    // 確保 members 陣列包含 demo-kid2
+    const famDoc = await db.collection('families').doc('demo-family').get();
+    if(famDoc.exists){
+      const members = famDoc.data().members || [];
+      if(!members.includes('demo-kid2')){
+        fsLog('writes', 'add demo-kid2 to demo-family members');
+        await db.collection('families').doc('demo-family').update({
+          members: firebase.firestore.FieldValue.arrayUnion('demo-kid2')
+        });
+        cacheClear('family_demo-family');
+      }
+    }
+  } catch(e){ console.warn('ensureDemoData:', e); }
 }
 
 async function checkUserSetup(){
@@ -711,7 +766,7 @@ async function loadHistoryPage(reset = false){
     const completedTasks = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     // 合併到 familyData.tasks（保留其他狀態的任務）
-    const nonCompleted = familyData.tasks.filter(t => t.status !== 'completed' || t.assignedTo !== liffUserId);
+    const nonCompleted = familyData.tasks.filter(t => t.status !== 'completed' || !taskIsFor(t,liffUserId));
     familyData.tasks = [...nonCompleted, ...completedTasks];
 
     // 載入兌換紀錄（最近 20 筆）
@@ -833,7 +888,7 @@ function captainHome(){
       <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">小冒險家狀況</p>
       <div class="space-y-3">
         ${kids.map(kid => {
-          const myT = familyData.tasks.filter(t => t.assignedTo===kid.id);
+          const myT = familyData.tasks.filter(t => taskIsFor(t,kid.id));
           const myDone = myT.filter(t => t.status==='completed').length;
           const myPend = myT.filter(t => t.status==='submitted').length;
           const myTodo = myT.filter(t => t.status==='pending').length;
@@ -965,25 +1020,41 @@ function captainTasks(){
 
   return `<div class="space-y-5">
     <div class="card p-4">
+      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">快速套用模板</p>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-4">
+        ${TASK_TEMPLATES.map(t => `
+        <button onclick="applyTemplate('${t.title}','${t.cat}',${t.pts})" class="card p-2.5 flex items-center gap-2 card-press hover:border-accent-blue/40 transition-all text-left">
+          <span class="text-lg shrink-0">${t.emoji}</span>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-semibold text-white truncate">${t.title}</p>
+            <p class="text-[10px] text-accent-gold">+${t.pts} 🐚</p>
+          </div>
+        </button>`).join('')}
+      </div>
+    </div>
+
+    <div class="card p-4">
       <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">新增任務</p>
       <div class="space-y-3">
         <input id="nTitle" type="text" placeholder="任務名稱…" class="w-full border rounded-xl px-4 py-3 text-sm">
         <div>
           <p class="text-xs text-gray-400 mb-2">指派給（可多選）</p>
           <div id="nKidSelect" class="flex flex-wrap gap-2">
-            ${kids.map(k => `<button type="button" onclick="toggleKidSelect(this,'${k.id}')" data-kid="${k.id}" class="kid-chip border border-dark-600 rounded-lg px-3 py-2 text-sm transition-all hover:border-accent-blue/50">${k.name}</button>`).join('')}
+            ${kids.map(k => `<button type="button" onclick="toggleKidSelect(this,'${k.id}')" data-kid="${k.id}" class="kid-chip border border-dark-600 rounded-xl px-3 py-2 text-sm transition-all hover:border-accent-blue/50 flex items-center gap-1.5"><span class="kid-check w-4 h-4 rounded-full border border-dark-600 flex items-center justify-center text-[10px] shrink-0"></span><span>${k.name}</span></button>`).join('')}
             ${kids.length===0?'<span class="text-xs text-gray-500">尚無小冒險家</span>':''}
           </div>
+          <p class="text-[10px] text-gray-600 mt-1">💡 可選擇多位，將為每位小冒險家各建立一筆任務</p>
         </div>
         <div class="grid grid-cols-2 gap-2">
           <select id="nCat" class="border rounded-xl px-3 py-3 text-sm">
             <option value="學習">學習</option><option value="家事">家事</option>
-            <option value="才藝">才藝</option><option value="運動">運動</option>
-            <option value="其他">其他</option>
+            <option value="運動">運動</option><option value="健康">健康</option>
+            <option value="創意">創意</option><option value="關懷">關懷</option>
+            <option value="才藝">才藝</option><option value="其他">其他</option>
           </select>
           <input id="nPts" type="number" value="20" placeholder="貝殼幣" class="border rounded-xl px-3 py-3 text-sm text-center">
         </div>
-        <button onclick="vibrate(10);addTask()" class="w-full bg-accent-blue text-white px-5 py-3 rounded-xl text-sm font-bold transition-all active:scale-90 hover:brightness-110 flex items-center justify-center gap-1">
+        <button id="addTaskBtn" onclick="vibrate(10);addTask()" class="w-full bg-accent-blue text-white px-5 py-3 rounded-xl text-sm font-bold transition-all active:scale-90 hover:brightness-110 flex items-center justify-center gap-1 opacity-50 cursor-not-allowed" disabled>
           <i class="ph-fill ph-plus"></i> 新增任務
         </button>
       </div>
@@ -1134,9 +1205,9 @@ function kidHome(){
   const streak = currentUser?.streak || 0;
   const ps = getPetStage(petEXP);
   const pPct = Math.min(100, Math.round(((petEXP - ps.minEXP) / (ps.maxEXP - ps.minEXP)) * 100));
-  const todos = familyData.tasks.filter(t => t.assignedTo===liffUserId && t.status==='pending');
-  const mySubmitted = familyData.tasks.filter(t => t.assignedTo===liffUserId && t.status==='submitted');
-  const done = familyData.tasks.filter(t => t.assignedTo===liffUserId && t.status==='completed');
+  const todos = familyData.tasks.filter(t => taskIsFor(t,liffUserId) && t.status==='pending');
+  const mySubmitted = familyData.tasks.filter(t => taskIsFor(t,liffUserId) && t.status==='submitted');
+  const done = familyData.tasks.filter(t => taskIsFor(t,liffUserId) && t.status==='completed');
   const activeReminder = familyData.reminders.find(r => r.isActive !== false);
   const nextAch = ACHIEVEMENTS.find(a => {
     if(a.type==='task_count') return done.length < a.threshold;
@@ -1240,9 +1311,9 @@ function kidTaskCard(t){
 // Kid: Tasks
 // ══════════════════════════════════════
 function kidTasks(){
-  const todo = familyData.tasks.filter(t => t.assignedTo===liffUserId && t.status==='pending');
-  const submitted = familyData.tasks.filter(t => t.assignedTo===liffUserId && t.status==='submitted');
-  const done = familyData.tasks.filter(t => t.assignedTo===liffUserId && t.status==='completed');
+  const todo = familyData.tasks.filter(t => taskIsFor(t,liffUserId) && t.status==='pending');
+  const submitted = familyData.tasks.filter(t => taskIsFor(t,liffUserId) && t.status==='submitted');
+  const done = familyData.tasks.filter(t => taskIsFor(t,liffUserId) && t.status==='completed');
 
   return `<div class="space-y-5">
     ${todo.length>0?`<div>
@@ -1318,7 +1389,7 @@ function kidStore(){
 // Kid: History
 // ══════════════════════════════════════
 function kidHistory(){
-  const done = familyData.tasks.filter(t => t.assignedTo===liffUserId && t.status==='completed');
+  const done = familyData.tasks.filter(t => taskIsFor(t,liffUserId) && t.status==='completed');
   const myR = familyData.redemptions.filter(r => r.userId===liffUserId);
   const totalEarned = done.reduce((s,t) => s + (t.reward||0), 0);
   const totalSpent = myR.filter(r => r.status==='approved').reduce((s,r) => s + (r.cost||0), 0);
@@ -1404,7 +1475,51 @@ function toggleKidSelect(btn, kidId){
   btn.classList.toggle('bg-accent-blue/20');
   btn.classList.toggle('border-accent-blue');
   btn.classList.toggle('text-accent-blue');
+  // 勾勾圖示
+  const check = btn.querySelector('.kid-check');
+  if(check){
+    if(btn.classList.contains('selected')){
+      check.innerHTML = '✓';
+      check.classList.add('bg-accent-blue','border-accent-blue','text-white');
+      check.classList.remove('border-dark-600');
+    } else {
+      check.innerHTML = '';
+      check.classList.remove('bg-accent-blue','border-accent-blue','text-white');
+      check.classList.add('border-dark-600');
+    }
+  }
+  // 更新新增按鈕狀態
+  updateAddTaskBtn();
   vibrate(5);
+}
+
+function applyTemplate(title, cat, pts){
+  const titleEl = document.getElementById('nTitle');
+  const catEl = document.getElementById('nCat');
+  const ptsEl = document.getElementById('nPts');
+  if(titleEl) titleEl.value = title;
+  if(ptsEl) ptsEl.value = pts;
+  if(catEl){
+    // 嘗試匹配類別，沒有就選「其他」
+    const opts = [...catEl.options].map(o => o.value);
+    catEl.value = opts.includes(cat) ? cat : '其他';
+  }
+  // 滾動到表單
+  titleEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  titleEl?.focus();
+  showToast(`已套用「${title}」模板，可修改後新增`,'blue');
+  vibrate(10);
+}
+
+function updateAddTaskBtn(){
+  const btn = document.getElementById('addTaskBtn');
+  if(!btn) return;
+  const count = document.querySelectorAll('#nKidSelect .kid-chip.selected').length;
+  btn.disabled = count === 0;
+  btn.classList.toggle('opacity-50', count === 0);
+  btn.classList.toggle('cursor-not-allowed', count === 0);
+  if(count > 1) btn.innerHTML = `<i class="ph-fill ph-plus"></i> 為 ${count} 位新增任務`;
+  else btn.innerHTML = '<i class="ph-fill ph-plus"></i> 新增任務';
 }
 
 async function addTask(){
