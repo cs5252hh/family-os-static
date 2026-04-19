@@ -301,7 +301,7 @@ let kidHomeTab = 0;          // 0=今日冒險, 1=我的票券, 2=我的成就
 let kidRewardHistoryExpanded = false;
 let storeCat = '全部';       // 全部 / 娛樂 / 美食 / 體驗 / 親子 / 特權
 let storeSort = 'cheap';    // cheap / newest / popular
-let kidHistoryTab = 0;       // 0=累積成就, 1=寵物成長, 2=活動日記
+let kidHistoryTab = 0;       // 0=累積成就, 1=寵物成長, 2=獎勵歷程, 3=活動日記
 let reportMonth = new Date().getMonth(); // 0-11
 let reportYear = new Date().getFullYear();
 
@@ -2185,9 +2185,14 @@ function kidHistory(){
   const bestStreak = currentUser?.bestStreak || streak;
   const coins = currentUser?.coins || 0;
 
+  const usedR = myR.filter(r => r.status==='used');
+  const rejectedR = myR.filter(r => r.status==='rejected');
+  const rewardHistBadge = usedR.length + rejectedR.length;
+
   const tabsHtml = tabBar([
     {emoji:'📊', label:'累積成就', count:null},
     {emoji:'🐱', label:'寵物成長', count:null},
+    {emoji:'🎁', label:'獎勵歷程', count:rewardHistBadge||null},
     {emoji:'📅', label:'活動日記', count:null}
   ], kidHistoryTab, 'switchKidHistoryTab');
 
@@ -2338,7 +2343,93 @@ function kidHistory(){
     </div></div>`;
   }
 
-  // ─── Tab 2: 活動日記 ───
+  // ─── Tab 2: 獎勵歷程 ───
+  if(kidHistoryTab===2){
+    const used = usedR.sort((a,b)=>(b.usedAt?.seconds||b.appliedAt?.seconds||0)-(a.usedAt?.seconds||a.appliedAt?.seconds||0));
+    const rejected = rejectedR.sort((a,b)=>(b.reviewedAt?.seconds||b.appliedAt?.seconds||0)-(a.reviewedAt?.seconds||a.appliedAt?.seconds||0));
+    const allHist = [...used,...rejected];
+    const showItems = rewardHistoryExpanded ? allHist : allHist.slice(0,10);
+    // Stats
+    const spentOnUsed = used.reduce((s,r)=>s+(r.cost||0),0);
+    // Most redeemed reward
+    const titleCounts = {};
+    allHist.forEach(r => { const t=r.rewardTitle||'獎勵'; titleCounts[t]=(titleCounts[t]||0)+1; });
+    const favReward = Object.entries(titleCounts).sort((a,b)=>b[1]-a[1])[0];
+    // Most redeemed category (from reward data)
+    const catCountsR = {};
+    allHist.forEach(r => { if(r.rewardCategory) catCountsR[r.rewardCategory]=(catCountsR[r.rewardCategory]||0)+1; });
+    const topCatR = Object.entries(catCountsR).sort((a,b)=>b[1]-a[1])[0];
+
+    return `<div>${tabsHtml}<div class="tab-content space-y-5">
+      <!-- 統計 -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="card p-3">
+          <p class="text-[10px] text-gray-500 mb-1">已使用獎勵</p>
+          <p class="text-2xl font-bold text-accent-green">${used.length}</p>
+        </div>
+        <div class="card p-3">
+          <p class="text-[10px] text-gray-500 mb-1">累積花費</p>
+          <p class="text-2xl font-bold text-accent-gold">${spentOnUsed} 🐚</p>
+        </div>
+        <div class="card p-3">
+          <p class="text-[10px] text-gray-500 mb-1">最愛獎勵</p>
+          <p class="text-sm font-bold text-white truncate">${favReward?favReward[0]:'—'}</p>
+          ${favReward?`<p class="text-[10px] text-gray-600">兌換 ${favReward[1]} 次</p>`:''}
+        </div>
+        <div class="card p-3">
+          <p class="text-[10px] text-gray-500 mb-1">常換類別</p>
+          <p class="text-sm font-bold text-white">${topCatR?topCatR[0]:'—'}</p>
+          ${topCatR?`<p class="text-[10px] text-gray-600">${topCatR[1]} 次</p>`:''}
+        </div>
+      </div>
+
+      <!-- 已使用 -->
+      ${used.length>0?`<div>
+        <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3"><i class="ph ph-check-circle text-accent-green mr-1"></i>已使用（${used.length}）</p>
+        <div class="space-y-2">${(rewardHistoryExpanded?used:used.slice(0,10)).map(r => {
+          const ago = r.usedAt ? timeAgo(r.usedAt) : (r.appliedAt ? timeAgo(r.appliedAt) : '');
+          return `<div class="card p-3 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-accent-green/10 flex items-center justify-center shrink-0">
+              ${r.rewardEmoji?'<span class="text-xl">'+r.rewardEmoji+'</span>':'<i class="ph-fill ph-check-circle text-accent-green text-xl"></i>'}
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-white truncate">${r.rewardTitle||'獎勵'}</p>
+              <p class="text-[10px] text-gray-600">於 ${ago}前使用 · ${r.cost||0} 🐚</p>
+            </div>
+            <span class="badge text-[9px] text-accent-green bg-accent-green/10">已使用 ✓</span>
+          </div>`;
+        }).join('')}</div>
+      </div>`:''}
+
+      <!-- 已駁回 -->
+      ${rejected.length>0?`<div>
+        <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3"><i class="ph ph-x-circle text-gray-500 mr-1"></i>已駁回（${rejected.length}）</p>
+        <div class="space-y-2">${(rewardHistoryExpanded?rejected:rejected.slice(0,5)).map(r => {
+          const ago = r.reviewedAt ? timeAgo(r.reviewedAt) : (r.appliedAt ? timeAgo(r.appliedAt) : '');
+          return `<div class="card p-3 flex items-center gap-3 opacity-70">
+            <div class="w-10 h-10 rounded-xl bg-dark-700 flex items-center justify-center shrink-0">
+              ${r.rewardEmoji?'<span class="text-xl">'+r.rewardEmoji+'</span>':'<i class="ph-fill ph-x-circle text-gray-500 text-xl"></i>'}
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-gray-400 truncate">${r.rewardTitle||'獎勵'}</p>
+              <p class="text-[10px] text-gray-600">於 ${ago}前駁回 · ${r.cost||0} 🐚 已退還</p>
+            </div>
+            <span class="badge text-[9px] text-gray-500 bg-dark-700">已駁回 ✗</span>
+          </div>`;
+        }).join('')}</div>
+        <div class="card p-3 mt-2 flex items-center gap-2" style="border-color:rgba(139,92,246,.15);background:linear-gradient(135deg,rgba(139,92,246,.04),transparent)">
+          <span class="text-lg shrink-0">💪</span>
+          <p class="text-xs text-gray-400">沒關係，繼續努力下次就成功！</p>
+        </div>
+      </div>`:''}
+
+      ${allHist.length===0?empty('ph-gift','還沒有獎勵歷程','去商城兌換第一個獎勵吧','去商城',"vibrate(5);switchPage('store')"):''}
+
+      ${!rewardHistoryExpanded&&allHist.length>10?`<button onclick="rewardHistoryExpanded=true;renderPage()" class="w-full card p-3 text-center text-sm text-accent-gold font-bold hover:bg-dark-700 transition-colors">載入更多（共 ${allHist.length} 筆）</button>`:''}
+    </div></div>`;
+  }
+
+  // ─── Tab 3: 活動日記 ───
   const events = [
     ...done.map(t => ({type:'task', title:t.title, pts:'+' + (t.reward||0), emoji:'✅',
       ts:(t.completedAt?.seconds||t.createdAt?.seconds||0)*1000,
