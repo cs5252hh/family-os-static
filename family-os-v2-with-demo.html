@@ -168,6 +168,41 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
+// ══════════════════════════════════════
+// [P5] Firestore 讀寫次數統計
+// ══════════════════════════════════════
+const fsStats = { reads: 0, writes: 0, snapshots: 0, cacheHits: 0 };
+function fsLog(type, desc='') {
+  fsStats[type] = (fsStats[type] || 0) + 1;
+  console.log(`[Firestore] ${type}: ${desc} | 累計 reads=${fsStats.reads} writes=${fsStats.writes} snapshots=${fsStats.snapshots} cacheHits=${fsStats.cacheHits}`);
+}
+
+// ══════════════════════════════════════
+// [P2] localStorage 快取層
+// ══════════════════════════════════════
+const CACHE_TTL = 10 * 60 * 1000; // 10 min
+function cacheGet(key, maxAgeMs = CACHE_TTL) {
+  try {
+    const raw = localStorage.getItem('fos_' + key);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts > maxAgeMs) { localStorage.removeItem('fos_' + key); return null; }
+    fsLog('cacheHits', key);
+    return data;
+  } catch(e) { return null; }
+}
+function cacheSet(key, data) {
+  try { localStorage.setItem('fos_' + key, JSON.stringify({ ts: Date.now(), data })); } catch(e) {}
+}
+function cacheClear(key) {
+  try { localStorage.removeItem('fos_' + key); } catch(e) {}
+}
+function cacheClearFamily() {
+  try {
+    Object.keys(localStorage).filter(k => k.startsWith('fos_')).forEach(k => localStorage.removeItem(k));
+  } catch(e) {}
+}
+
 const PET_STAGES = [
   {name:'神秘蛋',  emoji:'🥚',minEXP:0,  maxEXP:30 },
   {name:'毛茸茸',  emoji:'🐱',minEXP:30, maxEXP:60 },
@@ -218,7 +253,9 @@ let currentUser = null;
 let userFamily = null;
 let userRole = null;
 let currentPage = 'home';
-let unsubscribers = [];
+let coreListeners = [];      // [P1] 核心監聽（user + family 文檔）
+let activeListeners = [];    // [P1] 頁面級監聽，切頁時清除
+let historyLastDoc = null;   // [P3] 分頁游標
 
 let familyData = {
   tasks: [],
@@ -368,14 +405,37 @@ async function enterDemoMode(role){
 
 async function checkUserSetup(){
   try {
+    // [P2] 嘗試從快取讀取
+    const cachedUser = cacheGet('user_' + liffUserId);
+    if (cachedUser) {
+      currentUser = cachedUser;
+      userRole = currentUser.role;
+      updateLoadingText('載入家庭資料...');
+      const cachedFamily = cacheGet('family_' + currentUser.familyId);
+      if (cachedFamily) {
+        userFamily = cachedFamily;
+        updateLoadingText('準備就緒！');
+        await initMainApp();
+        // 背景更新快取
+        refreshUserAndFamily();
+        return;
+      }
+    }
+
+    // [P5] 一次取得 user 文檔
+    fsLog('reads', 'users/' + liffUserId);
     const userDoc = await db.collection('users').doc(liffUserId).get();
     if(userDoc.exists){
       currentUser = { id: liffUserId, ...userDoc.data() };
       userRole = currentUser.role;
+      cacheSet('user_' + liffUserId, currentUser);
       updateLoadingText('載入家庭資料...');
+
+      fsLog('reads', 'families/' + currentUser.familyId);
       const familyDoc = await db.collection('families').doc(currentUser.familyId).get();
       if(familyDoc.exists){
         userFamily = { id: familyDoc.id, ...familyDoc.data() };
+        cacheSet('family_' + userFamily.id, userFamily);
         updateLoadingText('準備就緒！');
         await initMainApp();
       } else { throw new Error('家庭不存在'); }
@@ -384,6 +444,19 @@ async function checkUserSetup(){
     console.error('用戶設定檢查失敗:', e);
     showSetupScreen();
   }
+}
+
+// [P2] 背景更新快取（不阻塞 UI）
+async function refreshUserAndFamily(){
+  try {
+    fsLog('reads', 'bg-refresh user+family');
+    const [uDoc, fDoc] = await Promise.all([
+      db.collection('users').doc(liffUserId).get(),
+      db.collection('families').doc(currentUser.familyId).get()
+    ]);
+    if(uDoc.exists){ currentUser = { id: liffUserId, ...uDoc.data() }; cacheSet('user_' + liffUserId, currentUser); }
+    if(fDoc.exists){ userFamily = { id: fDoc.id, ...fDoc.data() }; cacheSet('family_' + userFamily.id, userFamily); }
+  } catch(e){ console.warn('背景更新失敗:', e); }
 }
 
 // ══════════════════════════════════════
@@ -419,6 +492,7 @@ async function createFamily(){
   try {
     const inviteCode = generateInviteCode();
     const familyId = db.collection('families').doc().id;
+    fsLog('writes', 'createFamily: family+user+reminder');
     await db.collection('families').doc(familyId).set({
       name: familyName, inviteCode, members: [liffUserId],
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -448,10 +522,12 @@ async function joinFamily(){
   if(!inviteCode || !kidName){ alert('請填寫所有欄位'); return; }
   if(inviteCode.length !== 6){ alert('邀請碼必須是 6 位數'); return; }
   try {
+    fsLog('reads', 'joinFamily: query by inviteCode');
     const q = await db.collection('families').where('inviteCode','==',inviteCode).limit(1).get();
     if(q.empty){ alert('邀請碼不存在，請確認後重試'); return; }
     const familyDoc = q.docs[0];
     const familyId = familyDoc.id;
+    fsLog('writes', 'joinFamily: update family + set user');
     await db.collection('families').doc(familyId).update({
       members: firebase.firestore.FieldValue.arrayUnion(liffUserId),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -485,56 +561,172 @@ async function initMainApp(){
 
   await loadMembers();
   buildNav();
-  setupRealtimeListeners();
+  setupCoreListeners();      // [P1] 只監聽 user + family 文檔
   currentPage = 'home';
-  renderPage();
+  setupPageListeners('home'); // [P1] 按頁面監聽
 }
 
 async function loadMembers(){
   if(!userFamily?.members) return;
-  for(const memberId of userFamily.members){
+  // [P5] 並行載入所有成員，使用快取
+  const promises = userFamily.members.map(async (memberId) => {
+    const cached = cacheGet('user_' + memberId);
+    if (cached) { familyData.members[memberId] = cached; return; }
     try {
+      fsLog('reads', 'users/' + memberId);
       const doc = await db.collection('users').doc(memberId).get();
-      if(doc.exists) familyData.members[memberId] = { id: memberId, ...doc.data() };
+      if(doc.exists){
+        const data = { id: memberId, ...doc.data() };
+        familyData.members[memberId] = data;
+        cacheSet('user_' + memberId, data);
+      }
     } catch(e){ console.warn('無法載入成員:', memberId); }
-  }
+  });
+  await Promise.all(promises);
 }
 
-function setupRealtimeListeners(){
-  unsubscribers.forEach(fn => fn());
-  unsubscribers = [];
+// ══════════════════════════════════════
+// [P1] 智慧監聽：核心 + 按頁面
+// ══════════════════════════════════════
+function setupCoreListeners(){
+  // 核心監聽：只監聽 user 和 family 文檔（2 個 listener）
+  coreListeners.forEach(fn => fn());
+  coreListeners = [];
   const famRef = db.collection('families').doc(userFamily.id);
 
-  unsubscribers.push(famRef.collection('tasks').onSnapshot(snap => {
-    familyData.tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderPage();
-  }));
-  unsubscribers.push(famRef.collection('rewards').onSnapshot(snap => {
-    familyData.rewards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderPage();
-  }));
-  unsubscribers.push(famRef.collection('redemptions').onSnapshot(snap => {
-    familyData.redemptions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderPage();
-  }));
-  unsubscribers.push(famRef.collection('reminders').onSnapshot(snap => {
-    familyData.reminders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderPage();
-  }));
-  unsubscribers.push(db.collection('users').doc(liffUserId).onSnapshot(doc => {
+  fsLog('snapshots', 'core: users/' + liffUserId);
+  coreListeners.push(db.collection('users').doc(liffUserId).onSnapshot(doc => {
     if(doc.exists){
       currentUser = { id: liffUserId, ...doc.data() };
       familyData.members[liffUserId] = currentUser;
+      cacheSet('user_' + liffUserId, currentUser);
       renderPage();
     }
   }));
-  unsubscribers.push(famRef.onSnapshot(doc => {
+
+  fsLog('snapshots', 'core: families/' + userFamily.id);
+  coreListeners.push(famRef.onSnapshot(doc => {
     if(doc.exists){
       userFamily = { id: doc.id, ...doc.data() };
+      cacheSet('family_' + userFamily.id, userFamily);
       document.getElementById('sidebarFamilyName').textContent = userFamily.name;
       document.getElementById('sidebarInviteCode').textContent = userFamily.inviteCode;
     }
   }));
+}
+
+function clearPageListeners(){
+  activeListeners.forEach(fn => fn());
+  activeListeners = [];
+}
+
+function setupPageListeners(page){
+  clearPageListeners();
+  const famRef = db.collection('families').doc(userFamily.id);
+
+  // 每個頁面只監聽需要的 collection
+  if(userRole === 'captain'){
+    if(page === 'home' || page === 'tasks'){
+      // 首頁和任務頁都需要 tasks
+      fsLog('snapshots', 'page: tasks');
+      activeListeners.push(famRef.collection('tasks').onSnapshot(snap => {
+        familyData.tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderPage();
+      }));
+    }
+    if(page === 'home' || page === 'rewards'){
+      // 首頁（兌換審核）和獎勵頁需要 redemptions
+      fsLog('snapshots', 'page: redemptions');
+      activeListeners.push(famRef.collection('redemptions').onSnapshot(snap => {
+        familyData.redemptions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderPage();
+      }));
+    }
+    if(page === 'rewards'){
+      // 獎勵頁需要 rewards
+      fsLog('snapshots', 'page: rewards');
+      activeListeners.push(famRef.collection('rewards').onSnapshot(snap => {
+        familyData.rewards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderPage();
+      }));
+    }
+    if(page === 'reminders'){
+      fsLog('snapshots', 'page: reminders');
+      activeListeners.push(famRef.collection('reminders').onSnapshot(snap => {
+        familyData.reminders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderPage();
+      }));
+    }
+  } else {
+    // Kid 模式
+    if(page === 'home' || page === 'tasks'){
+      fsLog('snapshots', 'page: tasks');
+      activeListeners.push(famRef.collection('tasks').onSnapshot(snap => {
+        familyData.tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderPage();
+      }));
+    }
+    if(page === 'home'){
+      // 首頁需要 reminders（船長的話）— 用 .get() 一次讀取即可
+      fsLog('reads', 'reminders (one-time for kid home)');
+      famRef.collection('reminders').where('isActive','==',true).limit(5).get().then(snap => {
+        familyData.reminders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderPage();
+      });
+    }
+    if(page === 'store'){
+      // [P2] 獎勵用快取 + 一次讀取
+      const cachedRewards = cacheGet('rewards_' + userFamily.id);
+      if(cachedRewards){
+        familyData.rewards = cachedRewards;
+        renderPage();
+      }
+      fsLog('reads', 'rewards (one-time for store)');
+      famRef.collection('rewards').get().then(snap => {
+        familyData.rewards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        cacheSet('rewards_' + userFamily.id, familyData.rewards);
+        renderPage();
+      });
+    }
+    if(page === 'history'){
+      // [P3] 歷史頁 — 用 .get() + limit 分頁
+      loadHistoryPage(true);
+    }
+  }
+}
+
+// [P3] 歷史資料分頁載入
+async function loadHistoryPage(reset = false){
+  if(reset){ historyLastDoc = null; familyData.redemptions = []; }
+  const famRef = db.collection('families').doc(userFamily.id);
+  try {
+    // 載入已完成任務（最近 20 筆）
+    fsLog('reads', 'tasks completed (paginated)');
+    let tQuery = famRef.collection('tasks')
+      .where('assignedTo','==',liffUserId)
+      .where('status','==','completed')
+      .orderBy('completedAt','desc')
+      .limit(20);
+    const tSnap = await tQuery.get();
+    const completedTasks = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // 合併到 familyData.tasks（保留其他狀態的任務）
+    const nonCompleted = familyData.tasks.filter(t => t.status !== 'completed' || t.assignedTo !== liffUserId);
+    familyData.tasks = [...nonCompleted, ...completedTasks];
+
+    // 載入兌換紀錄（最近 20 筆）
+    fsLog('reads', 'redemptions (paginated)');
+    let rQuery = famRef.collection('redemptions')
+      .where('userId','==',liffUserId)
+      .orderBy('appliedAt','desc')
+      .limit(20);
+    if(historyLastDoc) rQuery = rQuery.startAfter(historyLastDoc);
+    const rSnap = await rQuery.get();
+    if(!rSnap.empty) historyLastDoc = rSnap.docs[rSnap.docs.length - 1];
+    const newRedemptions = rSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    familyData.redemptions = reset ? newRedemptions : [...familyData.redemptions, ...newRedemptions];
+    renderPage();
+  } catch(e){ console.error('載入歷程失敗:', e); }
 }
 
 // ══════════════════════════════════════
@@ -561,6 +753,7 @@ function switchPage(pageId){
   currentPage = pageId;
   const el = document.getElementById('viewEl');
   el.classList.remove('fade'); void el.offsetWidth; el.classList.add('fade');
+  setupPageListeners(pageId); // [P1] 切頁時重新訂閱
   renderPage();
   updateNavActive();
 }
@@ -1198,6 +1391,7 @@ function kidHistory(){
           <span class="font-bold text-sm ${e.pts.startsWith('+')?'text-accent-green':'text-red-400'} shrink-0">${e.pts} 🐚</span>
         </div>`).join('')}</div>`
       :empty('ph-clock-counter-clockwise','還沒有任何紀錄','完成任務後這裡會顯示你的歷程','去看任務',"vibrate(5);switchPage('tasks')")}
+      ${events.length >= 20 ? `<button onclick="vibrate(5);loadHistoryPage(false)" class="w-full mt-3 card p-3 text-center text-sm text-accent-blue font-bold hover:bg-dark-700 transition-colors">載入更多…</button>` : ''}
     </div>
   </div>`;
 }
@@ -1233,6 +1427,7 @@ async function addTask(){
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
     });
+    fsLog('writes', `addTask batch (${selectedKids.length} tasks)`);
     await batch.commit();
     document.getElementById('nTitle').value = '';
     document.querySelectorAll('#nKidSelect .kid-chip.selected').forEach(b => {
@@ -1247,6 +1442,7 @@ async function addTask(){
 
 async function submitTask(id){
   try {
+    fsLog('writes', 'submitTask');
     await db.collection('families').doc(userFamily.id).collection('tasks').doc(id).update({
       status: 'submitted', submittedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
@@ -1258,6 +1454,7 @@ async function approveTask(id){
   const t = familyData.tasks.find(t => t.id===id);
   if(!t) return;
   try {
+    // [P4] 已使用 batch — 任務完成 + 加幣 + 加 EXP
     const batch = db.batch();
     const famRef = db.collection('families').doc(userFamily.id);
     batch.update(famRef.collection('tasks').doc(id), {
@@ -1268,13 +1465,16 @@ async function approveTask(id){
       petEXP: firebase.firestore.FieldValue.increment(t.petEXP || 5),
       lastActiveAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+    fsLog('writes', 'approveTask batch (task+user)');
     await batch.commit();
+    cacheClear('user_' + t.assignedTo); // [P2] 寫入後清除快取
     showToast('<i class="ph-fill ph-check-circle mr-1"></i> 核准！貝殼幣已發放 🐚','green');
   } catch(e){ console.error('核准任務失敗:', e); showToast('核准失敗','red'); }
 }
 
 async function rejectTask(id){
   try {
+    fsLog('writes', 'rejectTask');
     await db.collection('families').doc(userFamily.id).collection('tasks').doc(id).update({ status: 'pending' });
     showToast('<i class="ph ph-x-circle mr-1"></i> 已退回','red');
   } catch(e){ console.error('退回任務失敗:', e); showToast('退回失敗','red'); }
@@ -1285,6 +1485,7 @@ async function redeemReward(rid){
   if(!r || (r.stock||0) <= 0){ showToast('此獎勵已售完','red'); return; }
   if((currentUser?.coins||0) < (r.cost||0)){ showToast('貝殼幣不足 🐚','red'); return; }
   try {
+    // [P4] 已使用 batch — 兌換申請 + 扣幣 + 扣庫存
     const batch = db.batch();
     const famRef = db.collection('families').doc(userFamily.id);
     batch.set(famRef.collection('redemptions').doc(), {
@@ -1298,13 +1499,17 @@ async function redeemReward(rid){
     batch.update(famRef.collection('rewards').doc(rid), {
       stock: firebase.firestore.FieldValue.increment(-1)
     });
+    fsLog('writes', 'redeemReward batch (redemption+user+reward)');
     await batch.commit();
+    cacheClear('user_' + liffUserId); // [P2]
+    cacheClear('rewards_' + userFamily.id); // [P2]
     showToast('<i class="ph-fill ph-gift mr-1"></i> 兌換申請已送出！等待船長確認 🚀','blue');
   } catch(e){ console.error('兌換失敗:', e); showToast('兌換失敗','red'); }
 }
 
 async function approveRedemption(id){
   try {
+    fsLog('writes', 'approveRedemption');
     await db.collection('families').doc(userFamily.id).collection('redemptions').doc(id).update({
       status: 'approved', reviewedAt: firebase.firestore.FieldValue.serverTimestamp(), reviewedBy: liffUserId
     });
@@ -1316,6 +1521,7 @@ async function rejectRedemption(id){
   const r = familyData.redemptions.find(r => r.id===id);
   if(!r) return;
   try {
+    // [P4] 已使用 batch — 駁回 + 退幣 + 退庫存
     const batch = db.batch();
     const famRef = db.collection('families').doc(userFamily.id);
     batch.update(famRef.collection('redemptions').doc(id), {
@@ -1329,16 +1535,21 @@ async function rejectRedemption(id){
         stock: firebase.firestore.FieldValue.increment(1)
       });
     }
+    fsLog('writes', 'rejectRedemption batch');
     await batch.commit();
+    cacheClear('user_' + r.userId); // [P2]
+    cacheClear('rewards_' + userFamily.id); // [P2]
     showToast('<i class="ph ph-x-circle mr-1"></i> 已駁回並退還貝殼幣','red');
   } catch(e){ console.error('駁回兌換失敗:', e); showToast('駁回失敗','red'); }
 }
 
 async function restock(rid){
   try {
+    fsLog('writes', 'restock');
     await db.collection('families').doc(userFamily.id).collection('rewards').doc(rid).update({
       stock: firebase.firestore.FieldValue.increment(1)
     });
+    cacheClear('rewards_' + userFamily.id); // [P2]
     const r = familyData.rewards.find(r => r.id===rid);
     showToast(`<i class="ph-fill ph-plus-circle mr-1"></i> ${r?.title||'獎勵'} 補貨成功！`,'green');
   } catch(e){ console.error('補貨失敗:', e); showToast('補貨失敗','red'); }
@@ -1372,10 +1583,12 @@ async function addReward(){
   const category = document.getElementById('mrCat')?.value;
   if(!title){ showToast('請輸入獎勵名稱','gold'); return; }
   try {
+    fsLog('writes', 'addReward');
     await db.collection('families').doc(userFamily.id).collection('rewards').add({
       title, cost, stock, category, icon: 'ph-gift', isActive: true,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: liffUserId
     });
+    cacheClear('rewards_' + userFamily.id); // [P2]
     closeModal(); showToast('<i class="ph-fill ph-gift mr-1"></i> 獎勵已新增！','green');
   } catch(e){ console.error('新增獎勵失敗:', e); showToast('新增失敗','red'); }
 }
@@ -1385,6 +1598,7 @@ async function addReminder(){
   const emoji = document.getElementById('sEmoji')?.value || '💡';
   if(!message){ showToast('請輸入提醒內容','gold'); return; }
   try {
+    fsLog('writes', 'addReminder');
     await db.collection('families').doc(userFamily.id).collection('reminders').add({
       emoji, message, isActive: true,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: liffUserId
@@ -1395,6 +1609,7 @@ async function addReminder(){
 
 async function deleteReminder(id){
   try {
+    fsLog('writes', 'deleteReminder');
     await db.collection('families').doc(userFamily.id).collection('reminders').doc(id).delete();
     showToast('已刪除提醒','red');
   } catch(e){ console.error('刪除提醒失敗:', e); showToast('刪除失敗','red'); }
@@ -1409,10 +1624,12 @@ function copyInviteCode(){
 }
 
 function logout(){
-  unsubscribers.forEach(fn => fn());
-  unsubscribers = [];
+  clearPageListeners();
+  coreListeners.forEach(fn => fn());
+  coreListeners = [];
   familyData = { tasks:[], rewards:[], redemptions:[], reminders:[], members:{} };
   currentUser = null; userFamily = null; userRole = null; liffUserId = null;
+  historyLastDoc = null;
   document.getElementById('mainApp').classList.add('hidden');
   document.getElementById('loadingScreen').classList.remove('hidden');
   showDemoModeOption();

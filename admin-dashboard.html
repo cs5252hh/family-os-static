@@ -180,6 +180,33 @@ const db = firebase.firestore();
 const ADMIN_EMAIL = 'cs5252hh@gmail.com';
 
 // ══════════════════════════════════════
+// Firestore 讀寫統計
+// ══════════════════════════════════════
+const fsStats = { reads: 0, writes: 0, cacheHits: 0 };
+function fsLog(type, desc='') {
+  fsStats[type] = (fsStats[type] || 0) + 1;
+  console.log(`[Firestore] ${type}: ${desc} | 累計 reads=${fsStats.reads} writes=${fsStats.writes} cacheHits=${fsStats.cacheHits}`);
+}
+
+// ══════════════════════════════════════
+// localStorage 快取層
+// ══════════════════════════════════════
+const CACHE_TTL = 10 * 60 * 1000;
+function cacheGet(key, maxAgeMs = CACHE_TTL) {
+  try {
+    const raw = localStorage.getItem('admin_' + key);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts > maxAgeMs) { localStorage.removeItem('admin_' + key); return null; }
+    fsLog('cacheHits', key);
+    return data;
+  } catch(e) { return null; }
+}
+function cacheSet(key, data) {
+  try { localStorage.setItem('admin_' + key, JSON.stringify({ ts: Date.now(), data })); } catch(e) {}
+}
+
+// ══════════════════════════════════════
 // State
 // ══════════════════════════════════════
 let allUsers = [];
@@ -187,6 +214,7 @@ let allFamilies = [];
 let familySubData = {}; // { familyId: { tasks:[], rewards:[], redemptions:[] } }
 let activityFeed = [];
 let currentTab = 'users';
+let tabDataLoaded = { users: false, families: false, activity: false };
 
 // ══════════════════════════════════════
 // Auth
@@ -230,21 +258,42 @@ function showScreen(name) {
 }
 
 // ══════════════════════════════════════
-// Data Loading
+// Data Loading（懶載入 + 快取）
 // ══════════════════════════════════════
 async function loadAllData() {
-  // Load users and families in parallel
-  const [usersSnap, familiesSnap] = await Promise.all([
-    db.collection('users').get(),
-    db.collection('families').get()
-  ]);
+  // 只先載入 users + families（統計和用戶列表需要）
+  const cachedUsers = cacheGet('allUsers');
+  const cachedFamilies = cacheGet('allFamilies');
 
-  allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-  allFamilies = familiesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  if (cachedUsers && cachedFamilies) {
+    allUsers = cachedUsers;
+    allFamilies = cachedFamilies;
+  } else {
+    fsLog('reads', 'users collection');
+    fsLog('reads', 'families collection');
+    const [usersSnap, familiesSnap] = await Promise.all([
+      db.collection('users').get(),
+      db.collection('families').get()
+    ]);
+    allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    allFamilies = familiesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    cacheSet('allUsers', allUsers);
+    cacheSet('allFamilies', allFamilies);
+  }
 
-  // Load subcollections for each family in parallel
+  // 不載入子集合 — 等切到 families/activity tab 時再載入
+  tabDataLoaded = { users: true, families: false, activity: false };
+
+  renderStats();
+  renderUsers();
+}
+
+// 延遲載入家庭子集合（僅在需要時）
+async function loadFamilySubData() {
+  if (Object.keys(familySubData).length > 0) return;
   familySubData = {};
   const subPromises = allFamilies.map(async (fam) => {
+    fsLog('reads', `families/${fam.id}/tasks+rewards+redemptions`);
     const [tasksSnap, rewardsSnap, redemptionsSnap] = await Promise.all([
       db.collection('families').doc(fam.id).collection('tasks').get(),
       db.collection('families').doc(fam.id).collection('rewards').get(),
@@ -257,19 +306,15 @@ async function loadAllData() {
     };
   });
   await Promise.all(subPromises);
-
-  // Build activity feed
-  buildActivityFeed();
-
-  // Render everything
-  renderStats();
-  renderUsers();
-  renderFamilies();
-  renderActivity();
 }
 
 async function refreshAll() {
   showScreen('loading');
+  // 清除快取強制重新載入
+  localStorage.removeItem('admin_allUsers');
+  localStorage.removeItem('admin_allFamilies');
+  familySubData = {};
+  tabDataLoaded = { users: false, families: false, activity: false };
   await loadAllData();
   showScreen('dashboard');
 }
@@ -543,7 +588,7 @@ function renderActivity() {
 // ══════════════════════════════════════
 // Tab Switching
 // ══════════════════════════════════════
-function switchTab(tab) {
+async function switchTab(tab) {
   currentTab = tab;
   ['users', 'families', 'activity'].forEach(t => {
     document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
@@ -554,6 +599,19 @@ function switchTab(tab) {
     );
     btn.classList.toggle('active', isActive);
   });
+
+  // 懶載入：只在切到該 tab 時才載入子集合
+  if (tab === 'families' && !tabDataLoaded.families) {
+    await loadFamilySubData();
+    renderFamilies();
+    tabDataLoaded.families = true;
+  }
+  if (tab === 'activity' && !tabDataLoaded.activity) {
+    await loadFamilySubData(); // activity 需要子集合資料
+    buildActivityFeed();
+    renderActivity();
+    tabDataLoaded.activity = true;
+  }
 }
 
 // ══════════════════════════════════════
