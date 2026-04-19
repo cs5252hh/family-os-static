@@ -54,6 +54,8 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
 .tab-btn:not(.active) .tab-badge{background:#2A2D3E;color:#9CA3AF;}
 .tab-content{animation:tabFadeIn .25s ease forwards;}
 @keyframes tabFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes legendShimmer{0%{background-position:200% center}100%{background-position:-200% center}}
+.rarity-legend{background:linear-gradient(90deg,#F59E0B,#FBBF24,#FDE68A,#FBBF24,#F59E0B);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:legendShimmer 3s linear infinite;}
 </style>
 </head>
 <body class="bg-dark-900 text-gray-200 min-h-screen" style="font-family:'Inter','Noto Sans TC',sans-serif">
@@ -2079,7 +2081,7 @@ function kidStore(){
     return 0; // popular — keep original
   });
   // Next affordable hint
-  const cantAfford = allActive.filter(r => (r.stock||0)>0 && coins < (r.cost||0)).sort((a,b)=>(a.cost||0)-(b.cost||0));
+  const cantAfford = allActive.filter(r => ((r.stock===undefined||r.stock<0) || (r.stock||0)>0) && coins < (r.cost||0)).sort((a,b)=>(a.cost||0)-(b.cost||0));
   const nextGoal = cantAfford[0];
   const STORE_CATS = ['全部','娛樂','美食','體驗','親子','特權'];
   const STORE_CAT_EMOJI = {'全部':'🏪','娛樂':'🎮','美食':'🍰','體驗':'🏖️','親子':'💝','特權':'🛡️'};
@@ -2108,18 +2110,35 @@ function kidStore(){
 
     <!-- 獎勵卡片 -->
     ${sorted.length>0?`<div class="grid grid-cols-2 gap-3">${sorted.map(r => {
-      const ok = coins >= (r.cost||0) && (r.stock||0) > 0;
-      const soldOut = (r.stock||0) <= 0;
+      const stk = r.stock===undefined ? -1 : (r.stock||0);
+      const infinite = stk < 0;
+      const soldOut = !infinite && stk <= 0;
+      const ok = coins >= (r.cost||0) && !soldOut;
       const diff = (r.cost||0) - coins;
       const pct = Math.min(100, Math.round((coins / (r.cost||1)) * 100));
-      return `<div class="card p-4 flex flex-col items-center text-center relative ${soldOut?'opacity-40':''}">
-        ${soldOut?'<div class="absolute inset-0 flex items-center justify-center z-10"><span class="bg-red-500/90 text-white text-[10px] font-bold px-3 py-1 rounded-full -rotate-12">已售完</span></div>':''}
-        <div class="text-5xl mb-2 ${ok?'float':''}">${r.emoji||'🎁'}</div>
+      // Kid-friendly stock text
+      const stkText = soldOut ? '售完了 😢'
+        : infinite ? '無限供應'
+        : stk > 5 ? '還有很多'
+        : stk >= 3 ? '還剩 '+stk+' 個'
+        : '只剩 '+stk+' 個！';
+      const stkColor = soldOut ? 'text-red-400'
+        : infinite ? 'text-accent-blue'
+        : stk > 5 ? 'text-accent-green'
+        : stk >= 3 ? 'text-gray-300'
+        : 'text-orange-400';
+      // Rarity
+      const cost = r.cost||0;
+      const rarity = cost > 100 ? {label:'傳說',cls:'rarity-legend font-bold'} : cost > 60 ? {label:'珍稀',cls:'text-accent-purple'} : cost > 30 ? {label:'精選',cls:'text-accent-blue'} : {label:'日常',cls:'text-gray-500'};
+      return `<div class="card p-4 flex flex-col items-center text-center relative ${soldOut?'opacity-50':''}">
+        <span class="absolute top-2 right-2 text-[9px] font-bold ${rarity.cls}">${rarity.label}</span>
+        ${soldOut?'<div class="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"><span class="bg-red-500/90 text-white text-[10px] font-bold px-3 py-1 rounded-full -rotate-12">已售完</span></div>':''}
+        <div class="text-5xl mb-1 ${ok?'float':''}">${r.emoji||'🎁'}</div>
+        <p class="text-[10px] ${stkColor} mb-1">${stkText}</p>
         <p class="font-bold text-white text-sm mb-1 leading-tight">${r.title}</p>
-        <p class="text-[10px] text-gray-600 mb-2">庫存 ${r.stock||0}</p>
-        <p class="text-lg font-bold ${ok?'text-accent-gold':'text-gray-500'} mb-2">${r.cost||0} 🐚</p>
-        ${soldOut?''
-          :ok?`<button onclick="vibrate(10);redeemReward('${r.id}')" class="w-full bg-accent-gold text-dark-900 h-9 rounded-xl text-xs font-bold transition-all active:scale-90 hover:brightness-110">兌換</button>`
+        <p class="text-lg font-bold ${ok?'text-accent-gold':'text-gray-500'} mb-2">${cost} 🐚</p>
+        ${soldOut?`<button disabled class="w-full bg-red-500/20 text-red-400 h-9 rounded-xl text-xs font-bold cursor-not-allowed">等待補貨</button>`
+          :ok?`<button onclick="vibrate(10);redeemReward('${r.id}')" class="w-full bg-accent-gold text-dark-900 h-9 rounded-xl text-xs font-bold transition-all active:scale-90 hover:brightness-110">立即兌換</button>`
           :`<div class="w-full">
             <div class="w-full h-1.5 rounded-full bg-dark-700 mb-1.5"><div class="h-full rounded-full bg-accent-gold/40" style="width:${pct}%"></div></div>
             <p class="text-[10px] text-gray-600">還差 <b class="text-red-400">${diff}</b> 🐚</p>
