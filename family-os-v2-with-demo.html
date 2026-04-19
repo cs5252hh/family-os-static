@@ -55,6 +55,10 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
 .tab-content{animation:tabFadeIn .25s ease forwards;}
 @keyframes tabFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @keyframes legendShimmer{0%{background-position:200% center}100%{background-position:-200% center}}
+@keyframes pendingPulse{0%,100%{opacity:.3}50%{opacity:1}}
+.pending-dots span{display:inline-block;width:4px;height:4px;border-radius:50%;background:#F59E0B;animation:pendingPulse 1.4s ease-in-out infinite;}
+.pending-dots span:nth-child(2){animation-delay:.2s;}
+.pending-dots span:nth-child(3){animation-delay:.4s;}
 .rarity-legend{background:linear-gradient(90deg,#F59E0B,#FBBF24,#FDE68A,#FBBF24,#F59E0B);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:legendShimmer 3s linear infinite;}
 </style>
 </head>
@@ -367,10 +371,11 @@ const NAV_CAPTAIN = [
   {id:'reminders',icon:'ph-fill ph-bell-ringing',  label:'貼心提醒'},
 ];
 const NAV_KID = [
-  {id:'home',   icon:'ph-fill ph-house',                    label:'首頁'},
-  {id:'tasks',  icon:'ph-fill ph-list-checks',              label:'任務'},
-  {id:'store',  icon:'ph-fill ph-storefront',               label:'商城'},
-  {id:'history',icon:'ph-fill ph-clock-counter-clockwise',  label:'歷程'},
+  {id:'home',      icon:'ph-fill ph-house',                    label:'首頁'},
+  {id:'tasks',     icon:'ph-fill ph-list-checks',              label:'任務'},
+  {id:'mytickets', icon:'ph-fill ph-ticket',                   label:'票券'},
+  {id:'store',     icon:'ph-fill ph-storefront',               label:'商城'},
+  {id:'history',   icon:'ph-fill ph-clock-counter-clockwise',  label:'歷程'},
 ];
 
 // ══════════════════════════════════════
@@ -859,6 +864,13 @@ function setupPageListeners(page){
         renderPage();
       }));
     }
+    if(page === 'mytickets'){
+      fsLog('snapshots', 'page: redemptions (mytickets)');
+      activeListeners.push(famRef.collection('redemptions').where('userId','==',liffUserId).onSnapshot(snap => {
+        familyData.redemptions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderPage();
+      }));
+    }
     if(page === 'store'){
       // [P2] 獎勵用快取 + 一次讀取
       const cachedRewards = cacheGet('rewards_' + userFamily.id);
@@ -1029,7 +1041,7 @@ function renderPage(){
                  : currentPage==='rewards' ? captainRewards()
                  : currentPage==='reminders' ? captainReminders() : '';
   } else {
-    const titles = {home:`嗨，${currentUser?.name||'冒險家'} 🚀`, tasks:'我的任務 ✅', store:'貝殼幣商城 🐚', history:'歷程紀錄 📖'};
+    const titles = {home:`嗨，${currentUser?.name||'冒險家'} 🚀`, tasks:'我的任務 ✅', mytickets:'我的票券 🎫', store:'貝殼幣商城 🐚', history:'歷程紀錄 📖'};
     ht.textContent = titles[currentPage] || '冒險島';
     const coins = currentUser?.coins || 0;
     const streak = currentUser?.streak || 0;
@@ -1038,6 +1050,7 @@ function renderPage(){
       ${streak>0?`<span class="card px-2 py-1.5 flex items-center gap-1"><span style="display:inline-block;animation:fl 0.8s ease-in-out infinite alternate">🔥</span><span class="text-orange-400 font-bold text-xs">${streak}</span></span>`:''}`;
     el.innerHTML = currentPage==='home' ? kidHome()
                  : currentPage==='tasks' ? kidTasks()
+                 : currentPage==='mytickets' ? kidRewardsTab(true)
                  : currentPage==='store' ? kidStore()
                  : currentPage==='history' ? kidHistory() : '';
   }
@@ -1722,7 +1735,7 @@ function captainReminders(){
 // ══════════════════════════════════════
 // Kid: Home
 // ══════════════════════════════════════
-function kidRewardsTab(){
+function kidRewardsTab(full){
   const coins = currentUser?.coins || 0;
   const approved = familyData.redemptions
     .filter(r => r.userId===liffUserId && r.status==='approved')
@@ -1730,6 +1743,9 @@ function kidRewardsTab(){
   const pending = familyData.redemptions
     .filter(r => r.userId===liffUserId && r.status==='pending')
     .sort((a,b)=>(b.appliedAt?.seconds||0)-(a.appliedAt?.seconds||0));
+  const showPending = full ? pending : pending.slice(0,3);
+  const showApproved = full ? approved : approved.slice(0,5);
+  const hasMore = !full && (pending.length>3 || approved.length>5);
 
   return `<div class="tab-content space-y-5">
     <!-- 貝殼幣餘額 -->
@@ -1741,24 +1757,46 @@ function kidRewardsTab(){
       </div>
     </div>
 
+    <!-- 等待船長審核 -->
+    ${pending.length>0?`<div>
+      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3"><i class="ph ph-hourglass text-orange-400 mr-1"></i>等待船長審核（${pending.length}）</p>
+      <div class="space-y-2">${showPending.map(r => {
+        const ago = r.appliedAt ? timeAgo(r.appliedAt) : '';
+        return `<div class="card p-3 flex items-center gap-3" style="border-color:rgba(245,158,11,.2);background:linear-gradient(135deg,rgba(245,158,11,.04),transparent)">
+          <div class="w-11 h-11 rounded-xl bg-orange-500/10 flex items-center justify-center shrink-0">
+            ${r.rewardEmoji?'<span class="text-xl">'+r.rewardEmoji+'</span>':'<i class="ph-fill ph-gift text-orange-400 text-xl"></i>'}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="font-semibold text-white text-sm">${r.rewardTitle||'獎勵'}</p>
+            <p class="text-[10px] text-gray-600 mt-0.5">${ago}申請 · ${r.cost||0} 🐚</p>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="badge text-[9px] text-orange-400 bg-orange-500/10 border border-orange-500/20">審核中</span>
+            <span class="pending-dots flex gap-0.5"><span></span><span></span><span></span></span>
+          </div>
+        </div>`;
+      }).join('')}
+      ${!full&&pending.length>3?`<p class="text-center text-xs text-gray-600 mt-1">還有 ${pending.length-3} 筆審核中…</p>`:''}</div>
+    </div>`:''}
+
     <!-- 可使用的票券 -->
     <div>
-      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3"><i class="ph ph-ticket text-orange-400 mr-1"></i>可使用的獎勵（${approved.length}）</p>
-      ${approved.length>0?`<div class="space-y-2">${approved.map(r => {
-        const ts = r.appliedAt ? new Date(r.appliedAt.seconds*1000) : null;
-        const dateStr = ts ? (ts.getMonth()+1)+'/'+ ts.getDate()+' '+String(ts.getHours()).padStart(2,'0')+':'+String(ts.getMinutes()).padStart(2,'0') : '';
-        return `<div class="card p-4 flex items-center gap-3 card-press" style="border-color:rgba(245,158,11,.2);background:linear-gradient(135deg,rgba(245,158,11,.05),transparent)">
+      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3"><i class="ph ph-ticket text-accent-gold mr-1"></i>可使用的獎勵（${approved.length}）</p>
+      ${approved.length>0?`<div class="space-y-2">${showApproved.map(r => {
+        const ago = r.reviewedAt ? timeAgo(r.reviewedAt) : (r.appliedAt ? timeAgo(r.appliedAt) : '');
+        return `<div class="card p-4 flex items-center gap-3 card-press" style="border-color:rgba(245,158,11,.15);background:linear-gradient(135deg,rgba(245,158,11,.06),transparent)">
           <div class="w-12 h-12 rounded-xl bg-accent-gold/10 flex items-center justify-center shrink-0">
             ${r.rewardEmoji?'<span class="text-2xl">'+r.rewardEmoji+'</span>':'<i class="ph-fill ph-ticket text-accent-gold text-2xl"></i>'}
           </div>
           <div class="flex-1 min-w-0">
             <p class="font-semibold text-white">${r.rewardTitle||'獎勵'}</p>
-            <p class="text-[10px] text-gray-600 mt-0.5"><i class="ph ph-clock mr-0.5"></i>${dateStr} 兌換</p>
+            <p class="text-[10px] text-gray-600 mt-0.5"><i class="ph ph-check-circle text-accent-green mr-0.5"></i>核准於 ${ago}前</p>
           </div>
-          <button onclick="vibrate(10);showUseTicketModal('${r.id}','${(r.rewardTitle||'').replace(/'/g,"\\\\'")}','${r.rewardEmoji||''}')" class="bg-orange-500 text-white px-4 h-9 rounded-xl text-xs font-bold transition-all active:scale-90 hover:brightness-110 shrink-0">使用</button>
+          <button onclick="vibrate(10);showUseTicketModal('${r.id}','${(r.rewardTitle||'').replace(/'/g,"\\\\'")}','${r.rewardEmoji||''}')" class="bg-accent-gold text-dark-900 px-4 h-9 rounded-xl text-xs font-bold transition-all active:scale-90 hover:brightness-110 shrink-0">使用</button>
         </div>`;
-      }).join('')}</div>`
-      :`<div class="card p-6 flex flex-col items-center text-center" style="border-color:rgba(245,158,11,.1)">
+      }).join('')}
+      ${!full&&approved.length>5?`<p class="text-center text-xs text-gray-600 mt-1">還有 ${approved.length-5} 張可用票券…</p>`:''}</div>`
+      :`<div class="card p-6 flex flex-col items-center text-center" style="border-color:rgba(245,158,11,.08)">
         <div class="w-14 h-14 rounded-2xl bg-dark-700 flex items-center justify-center mb-3"><i class="ph-fill ph-ticket text-3xl text-gray-600"></i></div>
         <p class="font-bold text-gray-400 mb-1">還沒有可使用的獎勵</p>
         <p class="text-xs text-gray-600 mb-4">去商城兌換，等船長核准就能使用了</p>
@@ -1766,24 +1804,7 @@ function kidRewardsTab(){
       </div>`}
     </div>
 
-    <!-- 等待審核 -->
-    ${pending.length>0?`<div>
-      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3"><i class="ph ph-hourglass text-accent-gold mr-1"></i>等待船長審核（${pending.length}）</p>
-      <div class="space-y-2">${pending.map(r => {
-        const ts = r.appliedAt ? new Date(r.appliedAt.seconds*1000) : null;
-        const dateStr = ts ? (ts.getMonth()+1)+'/'+ts.getDate()+' '+String(ts.getHours()).padStart(2,'0')+':'+String(ts.getMinutes()).padStart(2,'0') : '';
-        return `<div class="card p-3 flex items-center gap-3 opacity-70">
-          <div class="w-10 h-10 rounded-xl bg-accent-gold/10 flex items-center justify-center shrink-0">
-            ${r.rewardEmoji?'<span class="text-lg">'+r.rewardEmoji+'</span>':'<i class="ph-fill ph-gift text-accent-gold text-lg"></i>'}
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm text-white truncate">${r.rewardTitle||'獎勵'}</p>
-            <p class="text-[10px] text-gray-600">${dateStr} 申請 · ${r.cost||0} 🐚</p>
-          </div>
-          <span class="badge text-[9px] text-accent-gold bg-accent-gold/10">審核中</span>
-        </div>`;
-      }).join('')}</div>
-    </div>`:''}
+    ${hasMore?`<button onclick="vibrate(5);switchPage('mytickets')" class="w-full card p-3 text-center text-sm text-accent-gold font-bold hover:bg-dark-700 transition-colors card-press">查看完整票券 →</button>`:''}
   </div>`;
 }
 
@@ -1929,15 +1950,17 @@ function kidHome(){
   });
   const approvedTickets = familyData.redemptions.filter(r => r.userId===liffUserId && r.status==='approved');
   const pendingTickets = familyData.redemptions.filter(r => r.userId===liffUserId && r.status==='pending');
-  const ticketBadge = approvedTickets.length + pendingTickets.length;
+  const ticketBadge = (pendingTickets.length && approvedTickets.length)
+    ? pendingTickets.length+'+'+approvedTickets.length
+    : (pendingTickets.length+approvedTickets.length)||null;
 
   const tabsHtml = tabBar([
     {emoji:'🌟', label:'今日冒險', count:todos.length||null},
-    {emoji:'🎫', label:'我的票券', count:ticketBadge||null},
+    {emoji:'🎫', label:'我的票券', count:ticketBadge},
     {emoji:'🏆', label:'我的成就', count:earned.length||null}
   ], kidHomeTab, 'switchKidHomeTab');
 
-  if(kidHomeTab===1) return `<div>${tabsHtml}${kidRewardsTab()}</div>`;
+  if(kidHomeTab===1) return `<div>${tabsHtml}${kidRewardsTab(false)}</div>`;
   if(kidHomeTab===2) return `<div>${tabsHtml}${kidAchievementsTab()}</div>`;
 
   // Tab 0: 今日冒險
