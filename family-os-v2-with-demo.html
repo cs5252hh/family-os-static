@@ -291,8 +291,11 @@ let historySort = 'newest';  // newest / oldest
 let reminderTab = 0;         // 0=新增提醒, 1=提醒清單
 let reminderTemplateCat = '早晨';
 let captainHomeTab = 0;      // 0=今日總覽, 1=月度報告
-let kidHomeTab = 0;          // 0=今日冒險, 1=我的獎勵, 2=我的成就
+let kidHomeTab = 0;          // 0=今日冒險, 1=我的票券, 2=我的成就
 let kidRewardHistoryExpanded = false;
+let storeCat = '全部';       // 全部 / 娛樂 / 美食 / 體驗 / 親子 / 特權
+let storeSort = 'cheap';    // cheap / newest / popular
+let kidHistoryTab = 0;       // 0=累積成就, 1=寵物成長, 2=活動日記
 let reportMonth = new Date().getMonth(); // 0-11
 let reportYear = new Date().getFullYear();
 
@@ -942,6 +945,9 @@ function switchTaskTab(idx){ taskTab=idx; renderPage(); }
 function switchReminderTab(idx){ reminderTab=idx; renderPage(); }
 function switchCaptainHomeTab(idx){ captainHomeTab=idx; renderPage(); }
 function switchKidHomeTab(idx){ kidHomeTab=idx; renderPage(); }
+function switchStoreCat(cat){ storeCat=cat; renderPage(); }
+function switchStoreSort(s){ storeSort=s; renderPage(); }
+function switchKidHistoryTab(idx){ kidHistoryTab=idx; renderPage(); }
 function shiftReportMonth(delta){
   reportMonth += delta;
   if(reportMonth<0){ reportMonth=11; reportYear--; }
@@ -1716,13 +1722,12 @@ function captainReminders(){
 // ══════════════════════════════════════
 function kidRewardsTab(){
   const coins = currentUser?.coins || 0;
-  const activeRewards = familyData.rewards.filter(r => r.isActive!==false && (r.stock||0)>0);
-  const canAfford = activeRewards.filter(r => coins >= (r.cost||0));
-  const cantAfford = activeRewards.filter(r => coins < (r.cost||0));
-  const myRedemptions = familyData.redemptions
-    .filter(r => r.userId===liffUserId)
-    .sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-  const showRedemptions = kidRewardHistoryExpanded ? myRedemptions : myRedemptions.slice(0,5);
+  const approved = familyData.redemptions
+    .filter(r => r.userId===liffUserId && r.status==='approved')
+    .sort((a,b)=>(b.appliedAt?.seconds||0)-(a.appliedAt?.seconds||0));
+  const pending = familyData.redemptions
+    .filter(r => r.userId===liffUserId && r.status==='pending')
+    .sort((a,b)=>(b.appliedAt?.seconds||0)-(a.appliedAt?.seconds||0));
 
   return `<div class="tab-content space-y-5">
     <!-- 貝殼幣餘額 -->
@@ -1734,68 +1739,46 @@ function kidRewardsTab(){
       </div>
     </div>
 
-    <!-- 現在可以換 -->
-    ${canAfford.length>0?`<div>
-      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3"><i class="ph ph-check-circle text-accent-green mr-1"></i>現在可以換！</p>
-      <div class="space-y-2">${canAfford.map(r => {
-        const cc = CAT_COLORS[r.category] || 'text-gray-400 bg-dark-700';
-        return `<div class="card p-4 flex items-center gap-3 card-press" style="border-color:rgba(16,185,129,.15)">
-          <div class="w-11 h-11 rounded-xl bg-accent-green/10 flex items-center justify-center shrink-0">
-            ${r.emoji?`<span class="text-xl">${r.emoji}</span>`:`<i class="ph-fill ${r.icon||'ph-gift'} text-accent-gold text-xl"></i>`}
+    <!-- 可使用的票券 -->
+    <div>
+      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3"><i class="ph ph-ticket text-orange-400 mr-1"></i>可使用的獎勵（${approved.length}）</p>
+      ${approved.length>0?`<div class="space-y-2">${approved.map(r => {
+        const ts = r.appliedAt ? new Date(r.appliedAt.seconds*1000) : null;
+        const dateStr = ts ? (ts.getMonth()+1)+'/'+ ts.getDate()+' '+String(ts.getHours()).padStart(2,'0')+':'+String(ts.getMinutes()).padStart(2,'0') : '';
+        return `<div class="card p-4 flex items-center gap-3 card-press" style="border-color:rgba(245,158,11,.2);background:linear-gradient(135deg,rgba(245,158,11,.05),transparent)">
+          <div class="w-12 h-12 rounded-xl bg-accent-gold/10 flex items-center justify-center shrink-0">
+            ${r.rewardEmoji?'<span class="text-2xl">'+r.rewardEmoji+'</span>':'<i class="ph-fill ph-ticket text-accent-gold text-2xl"></i>'}
           </div>
           <div class="flex-1 min-w-0">
-            <p class="font-semibold text-white">${r.title}</p>
-            <div class="flex items-center gap-2 mt-0.5">
-              <span class="text-xs text-accent-gold font-bold">${r.cost||0} 🐚</span>
-              ${r.category?`<span class="badge text-[9px] ${cc}">${r.category}</span>`:''}
-            </div>
+            <p class="font-semibold text-white">${r.rewardTitle||'獎勵'}</p>
+            <p class="text-[10px] text-gray-600 mt-0.5"><i class="ph ph-clock mr-0.5"></i>${dateStr} 兌換</p>
           </div>
-          <button onclick="vibrate(10);redeemReward('${r.id}')" class="bg-accent-green text-white px-3 h-9 rounded-xl text-xs font-bold transition-all active:scale-90 hover:brightness-110 shrink-0">兌換</button>
+          <button onclick="vibrate(10);showUseTicketModal('${r.id}','${(r.rewardTitle||'').replace(/'/g,"\\\\'")}','${r.rewardEmoji||''}')" class="bg-orange-500 text-white px-4 h-9 rounded-xl text-xs font-bold transition-all active:scale-90 hover:brightness-110 shrink-0">使用</button>
         </div>`;
-      }).join('')}</div>
-    </div>`:''}
+      }).join('')}</div>`
+      :`<div class="card p-6 flex flex-col items-center text-center" style="border-color:rgba(245,158,11,.1)">
+        <div class="w-14 h-14 rounded-2xl bg-dark-700 flex items-center justify-center mb-3"><i class="ph-fill ph-ticket text-3xl text-gray-600"></i></div>
+        <p class="font-bold text-gray-400 mb-1">還沒有可使用的獎勵</p>
+        <p class="text-xs text-gray-600 mb-4">去商城兌換，等船長核准就能使用了</p>
+        <button onclick="vibrate(5);switchPage('store')" class="bg-accent-gold text-dark-900 px-5 py-2 rounded-xl text-sm font-bold transition-all active:scale-95">去商城逛逛</button>
+      </div>`}
+    </div>
 
-    <!-- 再努力一下 -->
-    ${cantAfford.length>0?`<div>
-      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3"><i class="ph ph-target text-gray-400 mr-1"></i>再努力一下</p>
-      <div class="space-y-2">${cantAfford.map(r => {
-        const diff = (r.cost||0) - coins;
-        return `<div class="card p-4 flex items-center gap-3 opacity-60">
-          <div class="w-11 h-11 rounded-xl bg-dark-700 flex items-center justify-center shrink-0">
-            ${r.emoji?`<span class="text-xl">${r.emoji}</span>`:`<i class="ph-fill ${r.icon||'ph-gift'} text-gray-500 text-xl"></i>`}
+    <!-- 等待審核 -->
+    ${pending.length>0?`<div>
+      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3"><i class="ph ph-hourglass text-accent-gold mr-1"></i>等待船長審核（${pending.length}）</p>
+      <div class="space-y-2">${pending.map(r => {
+        const ts = r.appliedAt ? new Date(r.appliedAt.seconds*1000) : null;
+        const dateStr = ts ? (ts.getMonth()+1)+'/'+ts.getDate()+' '+String(ts.getHours()).padStart(2,'0')+':'+String(ts.getMinutes()).padStart(2,'0') : '';
+        return `<div class="card p-3 flex items-center gap-3 opacity-70">
+          <div class="w-10 h-10 rounded-xl bg-accent-gold/10 flex items-center justify-center shrink-0">
+            ${r.rewardEmoji?'<span class="text-lg">'+r.rewardEmoji+'</span>':'<i class="ph-fill ph-gift text-accent-gold text-lg"></i>'}
           </div>
-          <div class="flex-1 min-w-0">
-            <p class="font-semibold text-gray-400">${r.title}</p>
-            <p class="text-xs text-gray-600 mt-0.5">${r.cost||0} 🐚 · 還差 <b class="text-red-400">${diff}</b> 🐚</p>
-          </div>
-        </div>`;
-      }).join('')}</div>
-    </div>`:''}
-
-    ${activeRewards.length===0?empty('ph-gift','商城目前沒有獎勵','等船長新增獎勵吧',''):''}
-
-    <!-- 兌換歷史 -->
-    ${myRedemptions.length>0?`<div>
-      <div class="flex justify-between items-center mb-3">
-        <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest"><i class="ph ph-scroll mr-1"></i>兌換歷史</p>
-        ${myRedemptions.length>5?`<button onclick="kidRewardHistoryExpanded=!kidRewardHistoryExpanded;renderPage()" class="text-xs text-accent-blue font-bold flex items-center gap-1">
-          <i class="ph ${kidRewardHistoryExpanded?'ph-caret-up':'ph-caret-down'}"></i>${kidRewardHistoryExpanded?'收合':'全部'}
-        </button>`:''}
-      </div>
-      <div class="space-y-2">${showRedemptions.map(r => {
-        const ts = r.createdAt ? new Date(r.createdAt.seconds*1000) : null;
-        const dateStr = ts ? (ts.getMonth()+1)+'/'+ts.getDate() : '';
-        const stMap = {approved:{icon:'ph-check-circle',color:'text-accent-green',bg:'bg-accent-green/10',label:'已核准'},
-          pending:{icon:'ph-clock',color:'text-accent-gold',bg:'bg-accent-gold/10',label:'待審核'},
-          rejected:{icon:'ph-x-circle',color:'text-gray-500',bg:'bg-dark-700',label:'已駁回'}};
-        const st = stMap[r.status] || stMap.pending;
-        return `<div class="card p-3 flex items-center gap-3">
-          <i class="ph-fill ${st.icon} ${st.color} text-lg shrink-0"></i>
           <div class="flex-1 min-w-0">
             <p class="text-sm text-white truncate">${r.rewardTitle||'獎勵'}</p>
-            <p class="text-[10px] text-gray-600">${dateStr} · ${r.cost||0} 🐚</p>
+            <p class="text-[10px] text-gray-600">${dateStr} 申請 · ${r.cost||0} 🐚</p>
           </div>
-          <span class="badge text-[9px] ${st.color} ${st.bg}">${st.label}</span>
+          <span class="badge text-[9px] text-accent-gold bg-accent-gold/10">審核中</span>
         </div>`;
       }).join('')}</div>
     </div>`:''}
@@ -1942,11 +1925,13 @@ function kidHome(){
     if(a.type==='pet_level') return petEXP >= a.threshold;
     return false;
   });
-  const affordableCount = familyData.rewards.filter(r => r.isActive !== false && coins >= (r.cost||0)).length;
+  const approvedTickets = familyData.redemptions.filter(r => r.userId===liffUserId && r.status==='approved');
+  const pendingTickets = familyData.redemptions.filter(r => r.userId===liffUserId && r.status==='pending');
+  const ticketBadge = approvedTickets.length + pendingTickets.length;
 
   const tabsHtml = tabBar([
     {emoji:'🌟', label:'今日冒險', count:todos.length||null},
-    {emoji:'🎁', label:'我的獎勵', count:affordableCount||null},
+    {emoji:'🎫', label:'我的票券', count:ticketBadge||null},
     {emoji:'🏆', label:'我的成就', count:earned.length||null}
   ], kidHomeTab, 'switchKidHomeTab');
 
@@ -2085,38 +2070,63 @@ function kidTasks(){
 // ══════════════════════════════════════
 function kidStore(){
   const coins = currentUser?.coins || 0;
+  const allActive = familyData.rewards.filter(r => r.isActive !== false);
+  const filtered = storeCat==='全部' ? allActive : allActive.filter(r => r.category===storeCat);
+  // Sort
+  const sorted = [...filtered].sort((a,b) => {
+    if(storeSort==='cheap') return (a.cost||0) - (b.cost||0);
+    if(storeSort==='newest') return (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0);
+    return 0; // popular — keep original
+  });
+  // Next affordable hint
+  const cantAfford = allActive.filter(r => (r.stock||0)>0 && coins < (r.cost||0)).sort((a,b)=>(a.cost||0)-(b.cost||0));
+  const nextGoal = cantAfford[0];
+  const STORE_CATS = ['全部','娛樂','美食','體驗','親子','特權'];
+  const STORE_CAT_EMOJI = {'全部':'🏪','娛樂':'🎮','美食':'🍰','體驗':'🏖️','親子':'💝','特權':'🛡️'};
 
-  return `<div class="space-y-5">
-    <div class="card p-5 flex items-center gap-4 gold-glow" style="border-color:rgba(245,158,11,.2)">
-      <div class="w-14 h-14 rounded-2xl bg-accent-gold/10 flex items-center justify-center shrink-0 text-3xl">🐚</div>
-      <div>
-        <p class="text-xs text-gray-500 mb-0.5">我的貝殼幣</p>
-        <p class="text-4xl font-bold text-accent-gold">${coins}</p>
-        <p class="text-[10px] text-gray-600 mt-0.5">完成任務可以賺更多 🚀</p>
-      </div>
+  return `<div class="space-y-4">
+    <!-- 餘額 hero -->
+    <div class="card p-5 gold-glow text-center" style="border-color:rgba(245,158,11,.2)">
+      <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">我的貝殼幣</p>
+      <p class="text-5xl font-bold text-accent-gold mb-1">${coins}</p>
+      ${nextGoal?`<p class="text-xs text-gray-500">再 <b class="text-accent-gold">${(nextGoal.cost||0)-coins}</b> 🐚 可換「${nextGoal.title}」</p>`
+      :`<p class="text-xs text-accent-green">所有獎勵都換得起！</p>`}
     </div>
-    <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest">可兌換獎勵</p>
-    ${familyData.rewards.length>0?`<div class="space-y-3">${familyData.rewards.filter(r => r.isActive !== false).map(r => {
+
+    <!-- 分類 pills -->
+    <div class="flex gap-1.5 overflow-x-auto pb-1" style="-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+      ${STORE_CATS.map(c => `<button onclick="switchStoreCat('${c}')" class="shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${storeCat===c?'bg-accent-gold text-dark-900':'bg-dark-700 text-gray-400 hover:text-white'}">${STORE_CAT_EMOJI[c]||''} ${c}</button>`).join('')}
+    </div>
+
+    <!-- 排序 -->
+    <div class="flex items-center gap-2">
+      <p class="text-[10px] text-gray-600 mr-auto">${sorted.length} 個獎勵</p>
+      ${[{k:'cheap',l:'最划算'},{k:'newest',l:'最新'},{k:'popular',l:'熱門'}].map(s =>
+        `<button onclick="switchStoreSort('${s.k}')" class="text-[10px] font-bold px-2 py-1 rounded-lg transition-all ${storeSort===s.k?'bg-accent-gold/15 text-accent-gold':'text-gray-600 hover:text-gray-400'}">${s.l}</button>`
+      ).join('')}
+    </div>
+
+    <!-- 獎勵卡片 -->
+    ${sorted.length>0?`<div class="grid grid-cols-2 gap-3">${sorted.map(r => {
       const ok = coins >= (r.cost||0) && (r.stock||0) > 0;
-      const cc = CAT_COLORS[r.category] || 'text-gray-400 bg-dark-700';
-      return `<div class="card p-4 flex items-center gap-3 card-press ${!ok?'opacity-60':''}">
-        <div class="w-12 h-12 rounded-xl bg-dark-700 flex items-center justify-center shrink-0">
-          ${r.emoji?`<span class="text-2xl">${r.emoji}</span>`:`<i class="ph-fill ${r.icon||'ph-gift'} text-accent-gold text-2xl"></i>`}
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-1.5 mb-0.5 flex-wrap">
-            <p class="font-semibold text-white">${r.title}</p>
-            ${r.category?`<span class="badge text-[9px] ${cc}">${r.category}</span>`:''}
-          </div>
-          <p class="text-xs text-gray-500">庫存 ${r.stock||0} · 需 ${r.cost||0} 🐚</p>
-        </div>
-        <button onclick="${ok?`vibrate(10);redeemReward('${r.id}')`:''}"
-          class="${ok?'bg-accent-gold text-dark-900 hover:brightness-110 active:scale-90':'bg-dark-700 text-gray-600 cursor-not-allowed'} px-3 h-10 rounded-xl text-xs font-bold transition-all shrink-0"
-          ${!ok?'disabled':''}>
-          ${(r.stock||0)<=0?'售完':ok?'兌換':'不足'}
-        </button>
+      const soldOut = (r.stock||0) <= 0;
+      const diff = (r.cost||0) - coins;
+      const pct = Math.min(100, Math.round((coins / (r.cost||1)) * 100));
+      return `<div class="card p-4 flex flex-col items-center text-center relative ${soldOut?'opacity-40':''}">
+        ${soldOut?'<div class="absolute inset-0 flex items-center justify-center z-10"><span class="bg-red-500/90 text-white text-[10px] font-bold px-3 py-1 rounded-full -rotate-12">已售完</span></div>':''}
+        <div class="text-5xl mb-2 ${ok?'float':''}">${r.emoji||'🎁'}</div>
+        <p class="font-bold text-white text-sm mb-1 leading-tight">${r.title}</p>
+        <p class="text-[10px] text-gray-600 mb-2">庫存 ${r.stock||0}</p>
+        <p class="text-lg font-bold ${ok?'text-accent-gold':'text-gray-500'} mb-2">${r.cost||0} 🐚</p>
+        ${soldOut?''
+          :ok?`<button onclick="vibrate(10);redeemReward('${r.id}')" class="w-full bg-accent-gold text-dark-900 h-9 rounded-xl text-xs font-bold transition-all active:scale-90 hover:brightness-110">兌換</button>`
+          :`<div class="w-full">
+            <div class="w-full h-1.5 rounded-full bg-dark-700 mb-1.5"><div class="h-full rounded-full bg-accent-gold/40" style="width:${pct}%"></div></div>
+            <p class="text-[10px] text-gray-600">還差 <b class="text-red-400">${diff}</b> 🐚</p>
+          </div>`}
       </div>`;
-    }).join('')}</div>`:empty('ph-storefront','商城還沒開張','等待船長新增獎勵吧','')}
+    }).join('')}</div>`
+    :empty('ph-storefront','這個分類還沒有獎勵','換個分類看看吧','')}
   </div>`;
 }
 
@@ -2127,79 +2137,213 @@ function kidHistory(){
   const done = familyData.tasks.filter(t => taskIsFor(t,liffUserId) && t.status==='completed');
   const myR = familyData.redemptions.filter(r => r.userId===liffUserId);
   const totalEarned = done.reduce((s,t) => s + (t.reward||0), 0);
-  const totalSpent = myR.filter(r => r.status==='approved').reduce((s,r) => s + (r.cost||0), 0);
+  const totalSpent = myR.filter(r => r.status!=='rejected').reduce((s,r) => s + (r.cost||0), 0);
   const petEXP = currentUser?.petEXP || 0;
   const streak = currentUser?.streak || 0;
+  const bestStreak = currentUser?.bestStreak || streak;
   const coins = currentUser?.coins || 0;
 
-  const events = [
-    ...done.map(t => ({type:'task', title:t.title, pts:'+' + (t.reward||0), icon:'ph-check-circle', color:'text-accent-green', bg:'bg-accent-green/10', sub:'任務完成・獲得貝殼幣', cat:t.category})),
-    ...myR.map(r => ({type:'redeem', title:r.rewardTitle||'獎勵', pts:'-' + (r.cost||0),
-      icon:r.status==='approved'?'ph-gift':'ph-x-circle',
-      color:r.status==='approved'?'text-accent-gold':r.status==='rejected'?'text-red-400':'text-gray-400',
-      bg:r.status==='approved'?'bg-accent-gold/10':r.status==='rejected'?'bg-red-400/10':'bg-dark-700',
-      sub:r.status==='approved'?'兌換已核准':r.status==='rejected'?'兌換已駁回・貝殼幣退還':'等待船長審核', cat:'兌換'})),
-  ];
+  const tabsHtml = tabBar([
+    {emoji:'📊', label:'累積成就', count:null},
+    {emoji:'🐱', label:'寵物成長', count:null},
+    {emoji:'📅', label:'活動日記', count:null}
+  ], kidHistoryTab, 'switchKidHistoryTab');
 
-  const unlockedAchs = ACHIEVEMENTS.map(a => {
-    let unlocked = false;
-    if(a.type==='task_count') unlocked = done.length >= a.threshold;
-    if(a.type==='streak') unlocked = streak >= a.threshold;
-    if(a.type==='coins') unlocked = coins >= a.threshold;
-    if(a.type==='pet_level') unlocked = petEXP >= a.threshold;
-    return { ...a, unlocked };
-  });
+  // ─── Tab 0: 累積成就 ───
+  if(kidHistoryTab===0){
+    // 7-day comparison
+    const now = new Date();
+    const d7 = new Date(now); d7.setDate(d7.getDate()-7);
+    const d14 = new Date(now); d14.setDate(d14.getDate()-14);
+    const last7 = done.filter(t => { const ts=(t.completedAt?.seconds||0)*1000; return ts>=d7.getTime(); }).length;
+    const prev7 = done.filter(t => { const ts=(t.completedAt?.seconds||0)*1000; return ts>=d14.getTime()&&ts<d7.getTime(); }).length;
+    const pctChange = prev7>0 ? Math.round(((last7-prev7)/prev7)*100) : (last7>0?100:0);
+    // This month coins
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthCoins = done.filter(t => { const ts=(t.completedAt?.seconds||0)*1000; return ts>=monthStart.getTime(); }).reduce((s,t)=>s+(t.reward||0),0);
 
-  return `<div class="space-y-5">
-    <div class="grid grid-cols-3 gap-3">
-      <div class="card p-3 text-center">
-        <p class="text-[10px] text-gray-500 mb-1">完成任務</p>
-        <p class="text-2xl font-bold text-accent-green">${done.length}</p>
-      </div>
-      <div class="card p-3 text-center">
-        <p class="text-[10px] text-gray-500 mb-1">累積賺取</p>
-        <p class="text-2xl font-bold text-accent-gold">${totalEarned}</p>
-      </div>
-      <div class="card p-3 text-center">
-        <p class="text-[10px] text-gray-500 mb-1">兌換花費</p>
-        <p class="text-2xl font-bold text-accent-purple">${totalSpent}</p>
-      </div>
-    </div>
+    const achProgress = ACHIEVEMENTS.map(a => {
+      let current = 0;
+      if(a.type==='task_count') current = done.length;
+      if(a.type==='streak') current = streak;
+      if(a.type==='coins') current = coins;
+      if(a.type==='pet_level') current = petEXP;
+      const unlocked = current >= a.threshold;
+      const pct = Math.min(100, Math.round((current/a.threshold)*100));
+      return { ...a, current, unlocked, pct };
+    });
+    const earnedAch = achProgress.filter(a => a.unlocked);
+    const lockedAch = achProgress.filter(a => !a.unlocked);
 
-    <div class="card p-4">
-      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">我的成就</p>
-      <div class="grid grid-cols-3 gap-2">
-        ${unlockedAchs.map(a => `
-        <div class="rounded-xl p-3 text-center ${a.unlocked?'bg-dark-700':'bg-dark-900 opacity-40'}">
-          <div class="w-9 h-9 rounded-xl ${a.unlocked?'bg-accent-gold/15':'bg-dark-700'} flex items-center justify-center mx-auto mb-1.5">
-            <i class="ph-fill ${a.icon} text-lg ${a.unlocked?'text-accent-gold':'text-gray-600'}"></i>
-          </div>
-          <p class="text-[9px] font-bold ${a.unlocked?'text-white':'text-gray-600'} leading-tight">${a.title}</p>
-          ${a.unlocked?'<p class="text-[8px] text-accent-gold mt-0.5">✓ 已解鎖</p>':''}
-        </div>`).join('')}
+    return `<div>${tabsHtml}<div class="tab-content space-y-5">
+      <!-- 統計卡片 -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="card p-3">
+          <p class="text-[10px] text-gray-500 mb-1">完成任務</p>
+          <p class="text-2xl font-bold text-accent-green">${done.length}</p>
+          <p class="text-[10px] mt-1 ${pctChange>=0?'text-accent-green':'text-red-400'}">${pctChange>=0?'↑':'↓'} ${Math.abs(pctChange)}% 近 7 天</p>
+        </div>
+        <div class="card p-3">
+          <p class="text-[10px] text-gray-500 mb-1">累積貝殼幣</p>
+          <p class="text-2xl font-bold text-accent-gold">${totalEarned}</p>
+          <p class="text-[10px] text-accent-gold mt-1">+${monthCoins} 本月</p>
+        </div>
+        <div class="card p-3">
+          <p class="text-[10px] text-gray-500 mb-1">兌換獎勵</p>
+          <p class="text-2xl font-bold text-accent-purple">${myR.filter(r=>r.status!=='rejected').length}</p>
+          <p class="text-[10px] text-gray-600 mt-1">共花費 ${totalSpent} 🐚</p>
+        </div>
+        <div class="card p-3">
+          <p class="text-[10px] text-gray-500 mb-1">連續打卡</p>
+          <p class="text-2xl font-bold text-orange-400">${streak} 天</p>
+          <p class="text-[10px] text-gray-600 mt-1">最佳 ${bestStreak} 天</p>
+        </div>
       </div>
-    </div>
 
-    <div>
-      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">活動紀錄</p>
-      ${events.length>0?`<div class="space-y-2">${events.map(e => `
-        <div class="card p-4 flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl ${e.bg} flex items-center justify-center shrink-0">
-            <i class="ph-fill ${e.icon} ${e.color} text-xl"></i>
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="font-semibold text-white truncate">${e.title}</p>
-            <div class="flex items-center gap-2 mt-0.5">
-              <p class="text-xs text-gray-500">${e.sub}</p>
-              ${e.cat?`<span class="text-[9px] text-gray-600 border border-dark-600 rounded px-1">${e.cat}</span>`:''}
+      <!-- 成就牆 -->
+      <div>
+        <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">成就牆</p>
+        ${earnedAch.length>0?`<div class="space-y-2 mb-4">${earnedAch.map(a => `
+          <div class="card p-3 flex items-center gap-3" style="border-color:rgba(245,158,11,.25);background:linear-gradient(135deg,rgba(245,158,11,.05),transparent)">
+            <div class="w-10 h-10 rounded-xl bg-accent-gold/15 flex items-center justify-center shrink-0"><i class="ph-fill ${a.icon} text-accent-gold text-xl"></i></div>
+            <div class="flex-1 min-w-0">
+              <p class="font-semibold text-white text-sm">${a.title} 🏅</p>
+              <p class="text-[10px] text-gray-500">${a.desc}</p>
             </div>
-          </div>
-          <span class="font-bold text-sm ${e.pts.startsWith('+')?'text-accent-green':'text-red-400'} shrink-0">${e.pts} 🐚</span>
-        </div>`).join('')}</div>`
-      :empty('ph-clock-counter-clockwise','還沒有任何紀錄','完成任務後這裡會顯示你的歷程','去看任務',"vibrate(5);switchPage('tasks')")}
-      ${events.length >= 20 ? `<button onclick="vibrate(5);loadHistoryPage(false)" class="w-full mt-3 card p-3 text-center text-sm text-accent-blue font-bold hover:bg-dark-700 transition-colors">載入更多…</button>` : ''}
-    </div>
-  </div>`;
+            <span class="text-[10px] text-accent-gold font-bold shrink-0">已解鎖</span>
+          </div>`).join('')}</div>`:''}
+        ${lockedAch.length>0?`<div class="space-y-2">${lockedAch.map(a => `
+          <div class="card p-3 flex items-center gap-3 opacity-60">
+            <div class="w-10 h-10 rounded-xl bg-dark-700 flex items-center justify-center shrink-0"><i class="ph-fill ${a.icon} text-gray-600 text-xl"></i></div>
+            <div class="flex-1 min-w-0">
+              <p class="font-semibold text-gray-400 text-sm">${a.title}</p>
+              <p class="text-[10px] text-gray-600">${a.desc}</p>
+              <div class="flex items-center gap-2 mt-1">
+                <div class="flex-1 h-1.5 rounded-full bg-dark-700"><div class="h-full rounded-full bg-accent-purple/60" style="width:${a.pct}%"></div></div>
+                <span class="text-[9px] text-gray-600 shrink-0">${a.current}/${a.threshold}</span>
+              </div>
+            </div>
+          </div>`).join('')}</div>`:''}
+      </div>
+    </div></div>`;
+  }
+
+  // ─── Tab 1: 寵物成長 ───
+  if(kidHistoryTab===1){
+    const ps = getPetStage(petEXP);
+    const pPct = Math.min(100, Math.round(((petEXP - ps.minEXP) / (ps.maxEXP - ps.minEXP)) * 100));
+    // Category breakdown for personality
+    const catCounts = {};
+    done.forEach(t => { if(t.category) catCounts[t.category] = (catCounts[t.category]||0)+1; });
+    const topCats = Object.entries(catCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const maxCat = topCats[0]?topCats[0][1]:1;
+    // Dominant personality
+    const CAT_PERSONALITY = {學習:'學霸型',家事:'勤勞型',才藝:'藝術型',運動:'運動型',健康:'健康型'};
+    const dominant = topCats[0] ? (CAT_PERSONALITY[topCats[0][0]]||topCats[0][0]+'達人') : '探索中';
+    // Next stage hint
+    const nextStage = PET_STAGES.find(s => s.minEXP > petEXP);
+
+    return `<div>${tabsHtml}<div class="tab-content space-y-5">
+      <!-- 當前寵物 -->
+      <div class="card p-5 text-center blue-glow">
+        <div class="text-6xl mb-2 float">${ps.emoji}</div>
+        <p class="text-lg font-bold text-white mb-1">${ps.name}</p>
+        <div class="flex justify-between text-[10px] text-gray-500 mb-1 max-w-[200px] mx-auto">
+          <span>EXP ${petEXP}</span><span>${ps.maxEXP < 999999 ? ps.maxEXP : '∞'}</span>
+        </div>
+        <div class="exp-bar max-w-[200px] mx-auto mb-2"><div class="exp-fill" style="width:${pPct}%"></div></div>
+        ${nextStage?`<p class="text-xs text-gray-500">再 <b class="text-accent-purple">${nextStage.minEXP - petEXP}</b> EXP 進化到 ${nextStage.emoji} ${nextStage.name}</p>`
+        :`<p class="text-xs text-accent-gold">已達到最高等級！</p>`}
+      </div>
+
+      <!-- 進化時間軸 -->
+      <div>
+        <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">進化歷程</p>
+        <div class="relative pl-8">
+          <div class="absolute left-3 top-2 bottom-2 w-0.5 bg-dark-600"></div>
+          ${PET_STAGES.map((st,i) => {
+            const reached = petEXP >= st.minEXP;
+            const isCurrent = ps.name === st.name;
+            return `<div class="relative mb-4 last:mb-0">
+              <div class="absolute left-[-20px] top-1 w-3 h-3 rounded-full ${reached?'bg-accent-purple':'bg-dark-600'} ${isCurrent?'ring-2 ring-accent-purple/50':''}"></div>
+              <div class="card p-3 flex items-center gap-3 ${!reached?'opacity-40':''}">
+                <span class="text-2xl">${st.emoji}</span>
+                <div class="flex-1">
+                  <p class="font-semibold text-sm ${reached?'text-white':'text-gray-600'}">${st.name}</p>
+                  <p class="text-[10px] text-gray-600">EXP ${st.minEXP}${st.maxEXP<999999?' → '+st.maxEXP:'+'}${isCurrent?' · 目前階段':''}</p>
+                </div>
+                ${reached&&!isCurrent?'<i class="ph-fill ph-check-circle text-accent-green shrink-0"></i>':''}
+                ${isCurrent?'<span class="badge text-[9px] text-accent-purple bg-accent-purple/10">目前</span>':''}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- 個性發展 -->
+      ${topCats.length>0?`<div>
+        <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-1">個性發展</p>
+        <p class="text-xs text-accent-purple mb-3">主導個性：<b>${dominant}</b></p>
+        <div class="space-y-2">${topCats.map(([cat,cnt]) => {
+          const w = Math.round((cnt/maxCat)*100);
+          const cc = CAT_COLORS[cat] || 'text-gray-400 bg-dark-700';
+          return `<div>
+            <div class="flex justify-between text-[10px] mb-0.5"><span class="text-gray-400">${cat}</span><span class="text-gray-600">${cnt} 次</span></div>
+            <div class="h-2 rounded-full bg-dark-700"><div class="h-full rounded-full bg-accent-purple/60" style="width:${w}%"></div></div>
+          </div>`;
+        }).join('')}</div>
+      </div>`:''}
+    </div></div>`;
+  }
+
+  // ─── Tab 2: 活動日記 ───
+  const events = [
+    ...done.map(t => ({type:'task', title:t.title, pts:'+' + (t.reward||0), emoji:'✅',
+      ts:(t.completedAt?.seconds||t.createdAt?.seconds||0)*1000,
+      desc:'完成任務', cat:t.category, color:'text-accent-green'})),
+    ...myR.filter(r=>r.status!=='pending').map(r => ({type:'redeem', title:r.rewardTitle||'獎勵',
+      pts:r.status==='rejected'?'+' + (r.cost||0):'-' + (r.cost||0),
+      emoji:r.status==='used'?'🎫':r.status==='approved'?'🎁':r.status==='rejected'?'❌':'⏳',
+      ts:(r.appliedAt?.seconds||0)*1000,
+      desc:r.status==='used'?'使用票券':r.status==='approved'?'兌換核准':r.status==='rejected'?'兌換駁回・退幣':'兌換中',
+      cat:'兌換', color:r.status==='rejected'?'text-red-400':'text-accent-gold'})),
+  ].sort((a,b) => b.ts - a.ts);
+
+  // Group by relative date
+  function dateLabel(ts){
+    const d = new Date(ts); const now = new Date();
+    const diff = Math.floor((now.setHours(0,0,0,0) - new Date(d).setHours(0,0,0,0)) / 86400000);
+    if(diff===0) return '今天';
+    if(diff===1) return '昨天';
+    if(diff<=3) return diff+'天前';
+    if(diff<=7) return '一週內';
+    return (d.getMonth()+1)+'/'+d.getDate();
+  }
+  const groups = {};
+  events.forEach(e => { const lbl = dateLabel(e.ts); if(!groups[lbl]) groups[lbl]=[]; groups[lbl].push(e); });
+  const groupKeys = Object.keys(groups);
+
+  return `<div>${tabsHtml}<div class="tab-content space-y-4">
+    ${groupKeys.length>0?groupKeys.map(lbl => `
+      <div>
+        <p class="text-[10px] text-gray-600 font-bold uppercase tracking-widest mb-2">${lbl}</p>
+        <div class="space-y-1.5">${groups[lbl].map(e => {
+          const t = new Date(e.ts);
+          const timeStr = String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+          return `<div class="card p-3 flex items-center gap-3">
+            <span class="text-[10px] text-gray-600 w-10 shrink-0 text-right">${timeStr}</span>
+            <span class="text-lg shrink-0">${e.emoji}</span>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm text-white truncate">${e.title}</p>
+              <p class="text-[10px] text-gray-600">${e.desc}${e.cat&&e.cat!=='兌換'?' · '+e.cat:''}</p>
+            </div>
+            <span class="text-xs font-bold ${e.pts.startsWith('+')?'text-accent-green':'text-red-400'} shrink-0">${e.pts} 🐚</span>
+          </div>`;
+        }).join('')}</div>
+      </div>`).join('')
+    :empty('ph-calendar-blank','還沒有任何活動','完成任務後這裡會記錄你的冒險日記','去看任務',"vibrate(5);switchPage('tasks')")}
+    ${events.length >= 20 ? `<button onclick="vibrate(5);loadHistoryPage(false)" class="w-full mt-3 card p-3 text-center text-sm text-accent-blue font-bold hover:bg-dark-700 transition-colors">載入更多…</button>` : ''}
+  </div></div>`;
 }
 
 // ══════════════════════════════════════
@@ -2339,7 +2483,7 @@ async function redeemReward(rid){
     const batch = db.batch();
     const famRef = db.collection('families').doc(userFamily.id);
     batch.set(famRef.collection('redemptions').doc(), {
-      rewardId: rid, rewardTitle: r.title, cost: r.cost || 0,
+      rewardId: rid, rewardTitle: r.title, rewardEmoji: r.emoji || '', cost: r.cost || 0,
       userId: liffUserId, status: 'pending',
       appliedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
@@ -2391,6 +2535,30 @@ async function rejectRedemption(id){
     cacheClear('rewards_' + userFamily.id); // [P2]
     showToast('<i class="ph ph-x-circle mr-1"></i> 已駁回並退還貝殼幣','red');
   } catch(e){ console.error('駁回兌換失敗:', e); showToast('駁回失敗','red'); }
+}
+
+function showUseTicketModal(redemptionId, title, emoji){
+  showModal(`
+    <div class="text-center py-2">
+      <div class="text-6xl mb-4">${emoji||'🎫'}</div>
+      <h3 class="text-lg font-bold text-white mb-2">確定要使用這張票券嗎？</h3>
+      <p class="text-sm text-gray-400 mb-6">「${title}」使用後就不能再用囉</p>
+      <div class="flex gap-3">
+        <button onclick="closeModal()" class="flex-1 bg-dark-700 text-gray-300 h-11 rounded-xl text-sm font-bold transition-all active:scale-95">再想想</button>
+        <button onclick="closeModal();useTicket('${redemptionId}')" class="flex-1 bg-orange-500 text-white h-11 rounded-xl text-sm font-bold transition-all active:scale-90 hover:brightness-110">確定使用</button>
+      </div>
+    </div>
+  `);
+}
+
+async function useTicket(redemptionId){
+  try {
+    fsLog('writes', 'useTicket');
+    await db.collection('families').doc(userFamily.id).collection('redemptions').doc(redemptionId).update({
+      status: 'used', usedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showToast('<i class="ph-fill ph-check-circle mr-1"></i> 票券已使用！','green');
+  } catch(e){ console.error('使用票券失敗:', e); showToast('使用失敗','red'); }
 }
 
 async function restock(rid){
