@@ -938,9 +938,21 @@ function setupPageListeners(page){
     if(page === 'home'){
       // 首頁需要 reminders（船長的話輪播）— 用 .get() 一次讀取全部啟用中的
       fsLog('reads', 'reminders (one-time for kid home)');
+      console.log('[Reminders] familyId:', userFamily.id, '| famRef path:', famRef.path);
       famRef.collection('reminders').where('isActive','==',true).orderBy('createdAt','desc').get().then(snap => {
+        console.log('[Reminders] 查詢成功，筆數:', snap.docs.length);
+        console.log('[Reminders] 查詢結果:', snap.docs.map(d => ({ id: d.id, ...d.data() })));
         familyData.reminders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         renderPage();
+      }).catch(err => {
+        console.error('[Reminders] 查詢失敗:', err.message || err);
+        console.error('[Reminders] 若看到 index 錯誤，請點擊上面的連結建立複合索引');
+        // Fallback: 不帶 orderBy 重試
+        famRef.collection('reminders').where('isActive','==',true).get().then(snap => {
+          console.log('[Reminders] Fallback 查詢成功，筆數:', snap.docs.length);
+          familyData.reminders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          renderPage();
+        }).catch(e2 => console.error('[Reminders] Fallback 也失敗:', e2));
       });
       // Kid home Tab 2 needs rewards + redemptions
       const cachedR = cacheGet('rewards_' + userFamily.id);
@@ -2540,6 +2552,7 @@ function kidHome(){
   const mySubmitted = familyData.tasks.filter(t => taskIsFor(t,liffUserId) && t.status==='submitted');
   const done = familyData.tasks.filter(t => taskIsFor(t,liffUserId) && t.status==='completed');
   const activeReminders = familyData.reminders.filter(r => r.isActive !== false);
+  console.log('[Reminders] familyData.reminders:', familyData.reminders.length, '| activeReminders:', activeReminders.length, activeReminders);
   const nextAch = ACHIEVEMENTS.find(a => {
     if(a.type==='task_count') return done.length < a.threshold;
     if(a.type==='streak') return streak < a.threshold;
