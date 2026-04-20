@@ -84,7 +84,6 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
         <h3 class="font-medium mb-4">🤔 你是？</h3>
         <div class="space-y-3">
           <button onclick="setupRole('captain')" class="w-full bg-blue-600 hover:bg-blue-700 rounded-lg py-3 px-4 transition-colors text-lg">👨‍✈️ 我是船長 (爸爸媽媽)</button>
-          <button onclick="setupRole('kid')" class="w-full bg-purple-600 hover:bg-purple-700 rounded-lg py-3 px-4 transition-colors text-lg">🧒 我是小冒險家 (小孩)</button>
         </div>
       </div>
     </div>
@@ -99,17 +98,7 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
       </div>
     </div>
     <div id="joinFamilyStep" class="hidden">
-      <h2 class="text-xl font-bold mb-4">🗝️ 加入家庭</h2>
-      <div class="card p-6">
-        <label class="block text-sm font-medium mb-2">邀請碼</label>
-        <input type="text" id="inviteCodeInput" placeholder="請輸入 6 位邀請碼" class="w-full border rounded-lg px-4 py-3 mb-4 uppercase tracking-widest">
-        <label class="block text-sm font-medium mb-2">你的名字</label>
-        <input type="text" id="kidNameInput" placeholder="例：小明、小美" class="w-full border rounded-lg px-4 py-3 mb-6">
-        <button onclick="joinFamily()" class="w-full bg-purple-600 hover:bg-purple-700 rounded-lg py-3 font-medium transition-colors">⛵ 加入冒險</button>
-      </div>
-      <div class="text-center mt-4">
-        <button onclick="showStep('welcomeStep')" class="text-gray-400 hover:text-white transition-colors">← 回到選擇</button>
-      </div>
+      <!-- Invite code join flow removed; kids use kid.html login -->
     </div>
   </div>
 </div>
@@ -128,14 +117,6 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
       </div>
       <div id="sideIdentity" class="mb-4 p-3 rounded-xl border border-dark-600"></div>
       <nav id="sideNav" class="space-y-1"></nav>
-      <!-- Invite Code -->
-      <div class="mt-6 p-3 card">
-        <div class="flex items-center justify-between mb-1">
-          <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">邀請碼</span>
-          <button onclick="copyInviteCode()" class="text-accent-blue hover:text-blue-300 text-xs"><i class="ph ph-copy"></i></button>
-        </div>
-        <div id="sidebarInviteCode" class="font-mono text-sm font-bold tracking-widest text-center text-white">------</div>
-      </div>
     </div>
     <div id="sideLogout" onclick="vibrate([5,30,5]);showLogoutConfirm()" class="p-3 card cursor-pointer hover:border-accent-red transition-all flex items-center gap-3 group card-press">
       <i class="ph ph-sign-out text-gray-500 group-hover:text-red-400 text-lg"></i>
@@ -378,6 +359,7 @@ const NAV_CAPTAIN = [
   {id:'rewards',  icon:'ph-fill ph-gift',          label:'獎勵中心'},
   {id:'reminders',icon:'ph-fill ph-bell-ringing',  label:'貼心提醒'},
   {id:'kids',     icon:'ph-fill ph-users-three',   label:'冒險家管理'},
+  {id:'account',  icon:'ph-fill ph-user-gear',     label:'帳號管理'},
 ];
 const NAV_KID = [
   {id:'home',      icon:'ph-fill ph-house',                    label:'首頁'},
@@ -731,20 +713,13 @@ function showSetupScreen(){
 }
 
 function showStep(stepId){
-  ['welcomeStep','createFamilyStep','joinFamilyStep'].forEach(id => {
+  ['welcomeStep','createFamilyStep'].forEach(id => {
     document.getElementById(id).classList.toggle('hidden', id !== stepId);
   });
 }
 
 function setupRole(role){
-  showStep(role === 'captain' ? 'createFamilyStep' : 'joinFamilyStep');
-}
-
-function generateInviteCode(){
-  const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ123456789';
-  let r = '';
-  for(let i=0;i<6;i++) r += chars.charAt(Math.floor(Math.random()*chars.length));
-  return r;
+  showStep('createFamilyStep');
 }
 
 async function createFamily(){
@@ -752,18 +727,17 @@ async function createFamily(){
   const captainName = document.getElementById('captainNameInput').value.trim();
   if(!familyName || !captainName){ alert('請填寫所有欄位'); return; }
   try {
-    const inviteCode = generateInviteCode();
     const familyId = db.collection('families').doc().id;
     fsLog('writes', 'createFamily: family+user+reminder');
     await db.collection('families').doc(familyId).set({
-      name: familyName, inviteCode, members: [liffUserId],
+      name: familyName, members: [liffUserId],
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       settings: { defaultTaskReward: 5, petEXPPerTask: 5, timezone: 'Asia/Taipei' },
       stats: { totalTasksCompleted: 0, totalCoinsEarned: 0, activeDays: 0 }
     });
     await db.collection('users').doc(liffUserId).set({
-      familyId, role: 'captain', name: captainName, coins: 0, petEXP: 0, streak: 0,
+      familyId, role: 'captain', name: captainName, avatar: '👨‍✈️', coins: 0, petEXP: 0, streak: 0,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       lastActiveAt: firebase.firestore.FieldValue.serverTimestamp()
     });
@@ -771,40 +745,13 @@ async function createFamily(){
       emoji: '👋', message: '歡迎來到我們的冒險島！', isActive: true,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: liffUserId
     });
-    currentUser = { id: liffUserId, familyId, role: 'captain', name: captainName, coins: 0, petEXP: 0, streak: 0 };
+    currentUser = { id: liffUserId, familyId, role: 'captain', name: captainName, avatar: '👨‍✈️', coins: 0, petEXP: 0, streak: 0 };
     userRole = 'captain';
-    userFamily = { id: familyId, name: familyName, inviteCode, members: [liffUserId] };
+    userFamily = { id: familyId, name: familyName, members: [liffUserId] };
     await initMainApp();
   } catch(e){ console.error('建立家庭失敗:', e); alert('建立家庭失敗，請重試'); }
 }
 
-async function joinFamily(){
-  const inviteCode = document.getElementById('inviteCodeInput').value.trim().toUpperCase();
-  const kidName = document.getElementById('kidNameInput').value.trim();
-  if(!inviteCode || !kidName){ alert('請填寫所有欄位'); return; }
-  if(inviteCode.length !== 6){ alert('邀請碼必須是 6 位數'); return; }
-  try {
-    fsLog('reads', 'joinFamily: query by inviteCode');
-    const q = await db.collection('families').where('inviteCode','==',inviteCode).limit(1).get();
-    if(q.empty){ alert('邀請碼不存在，請確認後重試'); return; }
-    const familyDoc = q.docs[0];
-    const familyId = familyDoc.id;
-    fsLog('writes', 'joinFamily: update family + set user');
-    await db.collection('families').doc(familyId).update({
-      members: firebase.firestore.FieldValue.arrayUnion(liffUserId),
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    await db.collection('users').doc(liffUserId).set({
-      familyId, role: 'kid', name: kidName, coins: 0, petEXP: 0, streak: 0,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      lastActiveAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    currentUser = { id: liffUserId, familyId, role: 'kid', name: kidName, coins: 0, petEXP: 0, streak: 0 };
-    userRole = 'kid';
-    userFamily = { id: familyId, ...familyDoc.data(), members: [...(familyDoc.data().members||[]), liffUserId] };
-    await initMainApp();
-  } catch(e){ console.error('加入家庭失敗:', e); alert('加入家庭失敗，請重試'); }
-}
 
 // ══════════════════════════════════════
 // Main App Init
@@ -818,7 +765,6 @@ async function initMainApp(){
 
   if(userFamily){
     document.getElementById('sidebarFamilyName').textContent = userFamily.name || 'ADVENTUREKIDS';
-    document.getElementById('sidebarInviteCode').textContent = userFamily.inviteCode || '------';
   }
 
   await loadMembers();
@@ -872,7 +818,6 @@ function setupCoreListeners(){
       userFamily = { id: doc.id, ...doc.data() };
       cacheSet('family_' + userFamily.id, userFamily);
       document.getElementById('sidebarFamilyName').textContent = userFamily.name;
-      document.getElementById('sidebarInviteCode').textContent = userFamily.inviteCode;
     }
   }));
 }
@@ -1038,7 +983,7 @@ function buildNav(){
     const name = currentUser?.name || (isCap ? '船長' : '冒險家');
     if(isCap){
       idEl.className = 'mb-4 p-3 rounded-xl border border-accent-blue/20 bg-accent-blue/5';
-      idEl.innerHTML = `<div class="flex items-center gap-2.5"><span class="text-xl">👨‍✈️</span><div><p class="text-xs font-bold text-accent-blue">船長後台</p><p class="text-[10px] text-gray-400">${name}</p></div></div>`;
+      idEl.innerHTML = `<div class="flex items-center gap-2.5"><span class="text-xl">${currentUser?.avatar||'👨‍✈️'}</span><div><p class="text-xs font-bold text-accent-blue">船長後台</p><p class="text-[10px] text-gray-400">${name}</p></div></div>`;
     } else {
       idEl.className = 'mb-4 p-3 rounded-xl border border-accent-gold/20 bg-accent-gold/5';
       idEl.innerHTML = `<div class="flex items-center gap-2.5"><span class="text-xl">${currentUser?.avatar||'🧒'}</span><div><p class="text-xs font-bold text-accent-gold">小冒險家</p><p class="text-[10px] text-gray-400">${name}</p></div></div>`;
@@ -1180,8 +1125,8 @@ function renderPage(){
   if(!el) return;
 
   if(userRole === 'captain'){
-    const titles = {home:'首頁總覽 ⚓', tasks:'任務管理 📋', rewards:'獎勵中心 🎁', reminders:'貼心提醒 🔔', kids:'冒險家管理 👥'};
-    const subs = {home:'船長總覽', tasks:'管理全家任務', rewards:'審核與管理獎勵', reminders:'設定貼心提醒', kids:'管理家中的小冒險家'};
+    const titles = {home:'首頁總覽 ⚓', tasks:'任務管理 📋', rewards:'獎勵中心 🎁', reminders:'貼心提醒 🔔', kids:'冒險家管理 👥', account:'帳號管理 ⚙️'};
+    const subs = {home:'船長總覽', tasks:'管理全家任務', rewards:'審核與管理獎勵', reminders:'設定貼心提醒', kids:'管理家中的小冒險家', account:'個人資料與家庭設定'};
     ht.textContent = titles[currentPage] || 'AdventureKids 冒險島';
     hr.innerHTML = '';
     if(hSub){ hSub.textContent = subs[currentPage]||''; hSub.classList.toggle('hidden', !subs[currentPage]); }
@@ -1190,7 +1135,8 @@ function renderPage(){
                  : currentPage==='tasks' ? captainTasks()
                  : currentPage==='rewards' ? captainRewards()
                  : currentPage==='reminders' ? captainReminders()
-                 : currentPage==='kids' ? captainKids() : '';
+                 : currentPage==='kids' ? captainKids()
+                 : currentPage==='account' ? captainAccount() : '';
   } else {
     const titles = {home:`嗨，${currentUser?.name||'冒險家'} 🚀`, tasks:'我的任務 ✅', store:'貝殼幣商城 🐚', history:'歷程紀錄 📖'};
     const subs = {home:'今天要完成什麼呢？', tasks:'加油完成任務吧！', store:'看看有什麼好東西', history:'你的冒險成績單'};
@@ -3570,12 +3516,213 @@ async function editReminder(id){
   } catch(e){ console.error('編輯提醒失敗:', e); showToast('編輯失敗','red'); }
 }
 
-function copyInviteCode(){
-  const code = userFamily?.inviteCode;
-  if(!code) return;
-  navigator.clipboard.writeText(code).then(() => {
-    showToast('<i class="ph ph-check mr-1"></i> 邀請碼已複製！','green');
-  }).catch(() => { showToast(`邀請碼: ${code}`,'blue'); });
+// ══════════════════════════════════════
+// Captain: Account Management
+// ══════════════════════════════════════
+function captainAccount(){
+  const avatar = currentUser?.avatar || '👨‍✈️';
+  const name = currentUser?.name || '船長';
+  const familyName = userFamily?.name || '冒險島';
+  const memberCount = userFamily?.members?.length || 0;
+
+  // Login method detection (based on currentUser.userId or liffUserId)
+  const uid = currentUser?.userId || liffUserId || '';
+  let loginMethod = '未知';
+  let loginIcon = '<i class="ph ph-question text-gray-400"></i>';
+  let loginDetailLabel = '';
+  let loginDetailValue = '';
+  if(uid === 'demo-captain'){
+    loginMethod = 'Demo 模式';
+    loginIcon = '<i class="ph-fill ph-flask text-purple-400"></i>';
+  } else if(uid.startsWith('google_')){
+    loginMethod = 'Google 登入';
+    loginIcon = '<i class="ph-bold ph-google-logo text-red-400"></i>';
+    const authUser = firebase.auth().currentUser;
+    if(authUser?.email){ loginDetailLabel = '帳號'; loginDetailValue = authUser.email; }
+    else if(authUser?.displayName){ loginDetailLabel = '名稱'; loginDetailValue = authUser.displayName; }
+  } else if(uid.startsWith('line_')){
+    loginMethod = 'LINE 登入';
+    loginIcon = '<i class="ph-bold ph-chat-circle-dots text-green-400"></i>';
+    loginDetailLabel = 'LINE ID';
+    loginDetailValue = uid.replace('line_','');
+  }
+
+  const emojiOptions = ['👨‍✈️','👩‍✈️','🧑‍✈️','🦸','🦸‍♀️','🧙','🧙‍♀️','🦊','🐻','🐯','🦁','🐼'];
+
+  return `
+  <div class="space-y-4">
+    <!-- Section A: Personal Profile -->
+    <div class="card p-5">
+      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-4"><i class="ph-fill ph-user mr-1"></i>個人資料</p>
+
+      <!-- Avatar -->
+      <div class="flex items-center gap-4 mb-4">
+        <div id="acctAvatarDisplay" onclick="toggleAvatarPicker()" class="w-16 h-16 rounded-2xl bg-dark-700 flex items-center justify-center text-4xl cursor-pointer hover:ring-2 hover:ring-accent-blue/50 transition-all active:scale-95">
+          ${avatar}
+        </div>
+        <div>
+          <p class="text-sm font-bold text-white">頭像</p>
+          <p class="text-[11px] text-gray-500">點擊更換</p>
+        </div>
+      </div>
+      <div id="acctAvatarPicker" class="hidden mb-4 p-3 rounded-xl bg-dark-700 border border-dark-600">
+        <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">選擇頭像</p>
+        <div class="flex flex-wrap gap-2">
+          ${emojiOptions.map(e => `
+            <button onclick="saveCaptainAvatar('${e}')" class="w-10 h-10 rounded-xl ${e===avatar?'bg-accent-blue/20 ring-2 ring-accent-blue':'bg-dark-600 hover:bg-dark-500'} flex items-center justify-center text-xl transition-all active:scale-90">
+              ${e}
+            </button>`).join('')}
+        </div>
+      </div>
+
+      <!-- Nickname -->
+      <div class="flex items-center justify-between py-3 border-t border-dark-600">
+        <div>
+          <p class="text-[11px] text-gray-500 mb-0.5">暱稱</p>
+          <p id="acctNameDisplay" class="text-sm font-bold text-white">${name}</p>
+        </div>
+        <button id="acctNameEditBtn" onclick="startEditCaptainName()" class="text-[11px] text-accent-blue hover:text-blue-300 font-medium transition-colors">編輯</button>
+      </div>
+      <div id="acctNameEditor" class="hidden py-3 border-t border-dark-600">
+        <p class="text-[11px] text-gray-500 mb-1.5">暱稱</p>
+        <div class="flex gap-2">
+          <input id="acctNameInput" type="text" value="${name}" maxlength="20" class="flex-1 bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:border-accent-blue focus:outline-none transition-colors">
+          <button onclick="saveCaptainName()" class="px-3 py-2 bg-accent-blue text-white rounded-lg text-xs font-bold hover:brightness-110 transition-all active:scale-95">儲存</button>
+          <button onclick="cancelEditCaptainName()" class="px-3 py-2 card text-xs font-bold text-gray-400 hover:text-white transition-colors">取消</button>
+        </div>
+        <p class="text-[10px] text-gray-600 mt-1">最多 20 個字</p>
+      </div>
+
+      <!-- Login Method -->
+      <div class="py-3 border-t border-dark-600">
+        <p class="text-[11px] text-gray-500 mb-0.5">登入方式</p>
+        <p class="text-sm text-white flex items-center gap-1.5">${loginIcon} ${loginMethod}</p>
+      </div>
+      ${loginDetailValue ? `
+      <div class="py-3 border-t border-dark-600">
+        <p class="text-[11px] text-gray-500 mb-0.5">${loginDetailLabel}</p>
+        <p class="text-sm text-gray-400">${loginDetailValue}</p>
+      </div>` : ''}
+    </div>
+
+    <!-- Section B: Family Info -->
+    <div class="card p-5">
+      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-4"><i class="ph-fill ph-island mr-1"></i>家庭資訊</p>
+
+      <!-- Family Name -->
+      <div class="flex items-center justify-between py-3">
+        <div>
+          <p class="text-[11px] text-gray-500 mb-0.5">冒險島名稱</p>
+          <p id="acctFamilyNameDisplay" class="text-sm font-bold text-white">${familyName}</p>
+        </div>
+        <button id="acctFamilyEditBtn" onclick="startEditFamilyName()" class="text-[11px] text-accent-blue hover:text-blue-300 font-medium transition-colors">編輯</button>
+      </div>
+      <div id="acctFamilyEditor" class="hidden py-3">
+        <p class="text-[11px] text-gray-500 mb-1.5">冒險島名稱</p>
+        <div class="flex gap-2">
+          <input id="acctFamilyInput" type="text" value="${familyName}" maxlength="30" class="flex-1 bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:border-accent-blue focus:outline-none transition-colors">
+          <button onclick="saveFamilyName()" class="px-3 py-2 bg-accent-blue text-white rounded-lg text-xs font-bold hover:brightness-110 transition-all active:scale-95">儲存</button>
+          <button onclick="cancelEditFamilyName()" class="px-3 py-2 card text-xs font-bold text-gray-400 hover:text-white transition-colors">取消</button>
+        </div>
+        <p class="text-[10px] text-gray-600 mt-1">最多 30 個字</p>
+      </div>
+
+      <!-- Member Count -->
+      <div class="py-3 border-t border-dark-600">
+        <p class="text-[11px] text-gray-500 mb-0.5">家庭成員數</p>
+        <p class="text-sm text-white">${memberCount} 人</p>
+      </div>
+    </div>
+
+    <!-- Section C: Account Operations -->
+    <div class="card p-5">
+      <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-4"><i class="ph-fill ph-gear-six mr-1"></i>帳號操作</p>
+      <button onclick="vibrate([5,30,5]);showLogoutConfirm()" class="w-full py-3 rounded-xl bg-dark-700 hover:bg-dark-600 border border-dark-600 text-red-400 text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+        <i class="ph ph-sign-out"></i> 登出船長後台
+      </button>
+    </div>
+  </div>`;
+}
+
+function toggleAvatarPicker(){
+  const picker = document.getElementById('acctAvatarPicker');
+  if(picker) picker.classList.toggle('hidden');
+}
+
+async function saveCaptainAvatar(emoji){
+  try {
+    await db.collection('users').doc(liffUserId).update({ avatar: emoji });
+    currentUser.avatar = emoji;
+    document.getElementById('acctAvatarPicker').classList.add('hidden');
+    buildNav(); // Update sidebar identity card
+    renderPage();
+    showToast('<i class="ph-fill ph-check mr-1"></i> 頭像已更新','green');
+  } catch(e){
+    console.error('更新頭像失敗:', e);
+    showToast('更新頭像失敗','red');
+  }
+}
+
+function startEditCaptainName(){
+  document.getElementById('acctNameDisplay').parentElement.parentElement.classList.add('hidden');
+  document.getElementById('acctNameEditor').classList.remove('hidden');
+  const input = document.getElementById('acctNameInput');
+  input.focus();
+  input.select();
+}
+
+function cancelEditCaptainName(){
+  document.getElementById('acctNameEditor').classList.add('hidden');
+  document.getElementById('acctNameDisplay').parentElement.parentElement.classList.remove('hidden');
+}
+
+async function saveCaptainName(){
+  const input = document.getElementById('acctNameInput');
+  const newName = input.value.trim();
+  if(!newName){ showToast('暱稱不能為空','gold'); return; }
+  if(newName.length > 20){ showToast('暱稱不能超過 20 個字','gold'); return; }
+  try {
+    await db.collection('users').doc(liffUserId).update({ name: newName });
+    currentUser.name = newName;
+    cancelEditCaptainName();
+    buildNav(); // Update sidebar identity card
+    renderPage();
+    showToast('<i class="ph-fill ph-check mr-1"></i> 暱稱已更新','green');
+  } catch(e){
+    console.error('更新暱稱失敗:', e);
+    showToast('更新暱稱失敗','red');
+  }
+}
+
+function startEditFamilyName(){
+  document.getElementById('acctFamilyNameDisplay').parentElement.parentElement.classList.add('hidden');
+  document.getElementById('acctFamilyEditor').classList.remove('hidden');
+  const input = document.getElementById('acctFamilyInput');
+  input.focus();
+  input.select();
+}
+
+function cancelEditFamilyName(){
+  document.getElementById('acctFamilyEditor').classList.add('hidden');
+  document.getElementById('acctFamilyNameDisplay').parentElement.parentElement.classList.remove('hidden');
+}
+
+async function saveFamilyName(){
+  const input = document.getElementById('acctFamilyInput');
+  const newName = input.value.trim();
+  if(!newName){ showToast('冒險島名稱不能為空','gold'); return; }
+  if(newName.length > 30){ showToast('名稱不能超過 30 個字','gold'); return; }
+  try {
+    await db.collection('families').doc(userFamily.id).update({ name: newName });
+    userFamily.name = newName;
+    document.getElementById('sidebarFamilyName').textContent = newName;
+    cancelEditFamilyName();
+    renderPage();
+    showToast('<i class="ph-fill ph-check mr-1"></i> 冒險島名稱已更新','green');
+  } catch(e){
+    console.error('更新家庭名稱失敗:', e);
+    showToast('更新失敗','red');
+  }
 }
 
 function showLogoutConfirm(){
