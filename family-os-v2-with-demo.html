@@ -287,7 +287,7 @@ let kidHomeTab = 0;          // 0=今日冒險, 1=我的票券, 2=我的成就
 let kidRewardHistoryExpanded = false;
 let storeCat = '全部';       // 全部 / 娛樂 / 美食 / 體驗 / 親子 / 特權
 let storeSort = 'cheap';    // cheap / newest / popular
-let kidHistoryTab = 0;       // 0=累積成就, 1=寵物成長, 2=獎勵歷程, 3=活動日記
+let kidHistoryTab = 0;       // 0=累積成就, 1=獎勵歷程, 2=活動日記 (寵物成長 Tab 暫時隱藏)
 let reportMonth = new Date().getMonth(); // 0-11
 let reportYear = new Date().getFullYear();
 let familyKids = [];  // 船長端：家庭內的小冒險家列表
@@ -1171,7 +1171,7 @@ function kidCardForCaptain(kid){
   const myTodo = myT.filter(t => t.status==='pending').length;
   const total = myT.length;
   const pct = total>0 ? Math.round((myDone/total)*100) : 0;
-  const ps = getPetStage(kid.petEXP||0);
+  // [PET_UI_HIDDEN] const ps = getPetStage(kid.petEXP||0); // 寵物階段暫不顯示
   // today's completed count
   const today = new Date(); today.setHours(0,0,0,0);
   const todayDone = myT.filter(t => {
@@ -1181,7 +1181,7 @@ function kidCardForCaptain(kid){
   }).length;
   return `<div class="card p-4">
     <div class="flex items-center gap-3 mb-3">
-      <div class="w-12 h-12 rounded-full bg-dark-700 flex items-center justify-center text-2xl shrink-0">${ps.emoji}</div>
+      <div class="w-12 h-12 rounded-full bg-dark-700 flex items-center justify-center text-2xl shrink-0">${kid.avatar||'🧒'}</div>
       <div class="flex-1 min-w-0">
         <div class="flex items-center justify-between mb-0.5">
           <div class="flex items-center gap-2">
@@ -1190,7 +1190,7 @@ function kidCardForCaptain(kid){
           </div>
           <span class="text-sm font-bold text-accent-gold">🐚${kid.coins||0}</span>
         </div>
-        <p class="text-[10px] text-gray-500">${ps.name} · 今日完成 <b class="text-accent-green">${todayDone}</b> 個</p>
+        <p class="text-[10px] text-gray-500">今日完成 <b class="text-accent-green">${todayDone}</b> 個</p>
       </div>
     </div>
     <div class="flex items-center gap-3">
@@ -1316,7 +1316,7 @@ function monthlyReport(){
         const kidTasks = mTasks.filter(t => taskIsFor(t,kid.id));
         const prevKidTasks = prevTasks.filter(t => taskIsFor(t,kid.id));
         const change = prevKidTasks.length>0 ? Math.round(((kidTasks.length - prevKidTasks.length)/prevKidTasks.length)*100) : 0;
-        const ps = getPetStage(kid.petEXP||0);
+        // [PET_UI_HIDDEN] const ps = getPetStage(kid.petEXP||0); // 寵物階段暫不顯示
         // top category
         const kCat = {};
         kidTasks.forEach(t => { kCat[t.category||'其他'] = (kCat[t.category||'其他']||0)+1; });
@@ -1328,9 +1328,9 @@ function monthlyReport(){
         const topRew = Object.entries(kRew).sort((a,b)=>b[1]-a[1])[0];
         return `<div class="card p-4">
           <div class="flex items-center gap-3 mb-3">
-            <div class="w-10 h-10 rounded-full bg-dark-700 flex items-center justify-center text-xl shrink-0">${ps.emoji}</div>
+            <div class="w-10 h-10 rounded-full bg-dark-700 flex items-center justify-center text-xl shrink-0">${kid.avatar||'🧒'}</div>
             <div class="flex-1 min-w-0">
-              <p class="font-bold text-white">${kid.name} <span class="text-[10px] text-gray-500 font-normal">${ps.name}</span></p>
+              <p class="font-bold text-white">${kid.name}</p>
               <div class="flex items-center gap-2 mt-0.5">
                 <span class="text-xs font-bold text-accent-blue">${kidTasks.length} 個任務</span>
                 ${prevKidTasks.length>0?`<span class="text-[10px] font-bold ${change>=0?'text-accent-green':'text-red-400'}">${change>=0?'↑':'↓'} ${Math.abs(change)}%</span>`:''}
@@ -1432,13 +1432,23 @@ function captainHome(){
   // Tab 0: 今日總覽
   const content = `<div class="tab-content space-y-5">
     ${urgent>0?`
-    <div class="rounded-2xl p-4 flex items-center gap-3 cursor-pointer card-press" onclick="vibrate(5);switchPage('tasks')" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25)">
-      <div class="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center shrink-0"><i class="ph-fill ph-warning text-red-400 text-xl"></i></div>
-      <div class="flex-1">
+    <div class="rounded-2xl p-4 space-y-2" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25)">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center shrink-0"><i class="ph-fill ph-warning text-red-400 text-xl"></i></div>
         <p class="font-bold text-white">有 ${urgent} 件事等你處理</p>
-        <p class="text-xs text-gray-400 mt-0.5">${pending.length>0?pending.length+' 個任務待審核':''}${pending.length>0&&pendingR.length>0?' · ':''}${pendingR.length>0?pendingR.length+' 個兌換待確認':''}</p>
       </div>
-      <i class="ph-fill ph-arrow-right text-red-400 text-lg shrink-0"></i>
+      ${pending.length>0?`
+      <div class="flex items-center gap-3 pl-2 py-1.5 rounded-xl hover:bg-white/5 cursor-pointer card-press transition-all" onclick="vibrate(5);taskTab=1;switchPage('tasks')">
+        <i class="ph-fill ph-list-checks text-orange-400"></i>
+        <p class="text-xs text-gray-300 flex-1">${pending.length} 個任務待審核</p>
+        <i class="ph ph-arrow-right text-gray-600 text-sm"></i>
+      </div>`:''}
+      ${pendingR.length>0?`
+      <div class="flex items-center gap-3 pl-2 py-1.5 rounded-xl hover:bg-white/5 cursor-pointer card-press transition-all" onclick="vibrate(5);rewardTab=1;switchPage('rewards')">
+        <i class="ph-fill ph-gift text-pink-400"></i>
+        <p class="text-xs text-gray-300 flex-1">${pendingR.length} 個兌換待確認</p>
+        <i class="ph ph-arrow-right text-gray-600 text-sm"></i>
+      </div>`:''}
     </div>`:`
     <div class="rounded-2xl p-4 flex items-center gap-3" style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2)">
       <i class="ph-fill ph-check-circle text-accent-green text-2xl shrink-0"></i>
@@ -2010,22 +2020,7 @@ function kidAchievementsTab(){
         </div>`).join('')}</div>`:''}
     </div>
 
-    <!-- 寵物成長歷程 -->
-    <div>
-      <div class="flex items-center justify-between mb-3">
-        <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest"><i class="ph ph-paw-print mr-1"></i>寵物成長歷程</p>
-        <span class="badge text-[9px] text-accent-gold bg-accent-gold/10">家庭版</span>
-      </div>
-      <div class="card p-4">
-        <div class="flex items-center justify-between gap-0.5">${allStages.map(s => `
-          <div class="flex flex-col items-center gap-1 flex-1 ${s.reached?'':'opacity-25'}">
-            <span class="${s.reached?'text-2xl':'text-xl'}">${s.emoji}</span>
-            <p class="text-[9px] font-bold ${s.reached?'text-white':'text-gray-600'}">${s.name}</p>
-            <p class="text-[8px] text-gray-600">${s.minEXP} EXP</p>
-          </div>`).join('<div class="w-4 h-0.5 bg-dark-600 shrink-0 self-center mb-4"></div>')}
-        </div>
-      </div>
-    </div>
+    <!-- [PET_UI_HIDDEN] 寵物成長歷程暫時隱藏 -->
   </div>`;
 }
 
@@ -2553,6 +2548,7 @@ function kidHome(){
       </div>${dots}</div>`;
     })()}
 
+    <!-- [PET_UI_HIDDEN] 寵物夥伴卡片暫時隱藏，未來復活時取消註解即可
     <div class="card p-4 blue-glow flex items-center gap-4">
       <div class="shrink-0 text-center">
         <div class="text-5xl mb-1 float">${ps.emoji}</div>
@@ -2571,6 +2567,7 @@ function kidHome(){
         </div>
       </div>
     </div>
+    [/PET_UI_HIDDEN] -->
 
     ${todayDone.length>0?`
     <div class="card p-3 flex items-center gap-3" style="border-color:rgba(16,185,129,.2)">
@@ -2768,9 +2765,10 @@ function kidHistory(){
   const rejectedR = myR.filter(r => r.status==='rejected');
   const rewardHistBadge = usedR.length + rejectedR.length;
 
+  // [PET_UI_HIDDEN] 寵物成長 Tab 暫時移除，原 Tab 索引：0=累積成就, 1=寵物成長, 2=獎勵歷程, 3=活動日記
+  // 現在 Tab 索引：0=累積成就, 1=獎勵歷程, 2=活動日記（kidHistoryTab 值對應調整）
   const tabsHtml = tabBar([
     {emoji:'📊', label:'累積成就', count:null},
-    {emoji:'🐱', label:'寵物成長', count:null},
     {emoji:'🎁', label:'獎勵歷程', count:rewardHistBadge||null},
     {emoji:'📅', label:'活動日記', count:null}
   ], kidHistoryTab, 'switchKidHistoryTab');
@@ -2854,8 +2852,8 @@ function kidHistory(){
     </div></div>`;
   }
 
-  // ─── Tab 1: 寵物成長 ───
-  if(kidHistoryTab===1){
+  // ─── [PET_UI_HIDDEN] Tab 寵物成長 暫時隱藏，復活時改回 kidHistoryTab===1 並恢復 tab bar ───
+  if(kidHistoryTab===99){
     const ps = getPetStage(petEXP);
     const pPct = Math.min(100, Math.round(((petEXP - ps.minEXP) / (ps.maxEXP - ps.minEXP)) * 100));
     // Category breakdown for personality
@@ -2922,8 +2920,8 @@ function kidHistory(){
     </div></div>`;
   }
 
-  // ─── Tab 2: 獎勵歷程 ───
-  if(kidHistoryTab===2){
+  // ─── Tab 1: 獎勵歷程 (原 Tab 2，因寵物 Tab 隱藏而前移) ───
+  if(kidHistoryTab===1){
     const used = usedR.sort((a,b)=>(b.usedAt?.seconds||b.appliedAt?.seconds||0)-(a.usedAt?.seconds||a.appliedAt?.seconds||0));
     const rejected = rejectedR.sort((a,b)=>(b.reviewedAt?.seconds||b.appliedAt?.seconds||0)-(a.reviewedAt?.seconds||a.appliedAt?.seconds||0));
     const allHist = [...used,...rejected];
@@ -3008,7 +3006,7 @@ function kidHistory(){
     </div></div>`;
   }
 
-  // ─── Tab 3: 活動日記 ───
+  // ─── Tab 2: 活動日記 (原 Tab 3，因寵物 Tab 隱藏而前移) ───
   const events = [
     ...done.map(t => ({type:'task', title:t.title, pts:'+' + (t.reward||0), emoji:'✅',
       ts:(t.completedAt?.seconds||t.createdAt?.seconds||0)*1000,
