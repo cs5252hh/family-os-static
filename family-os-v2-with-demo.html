@@ -336,21 +336,21 @@ const REMINDER_CATS = ['早晨','學習','情緒','健康','人際','睡前'];
 const REMINDER_CAT_EMOJIS = {'早晨':'🌅','學習':'📚','情緒':'❤️','健康':'🏃','人際':'🤝','睡前':'🌙'};
 
 const REWARD_CAT_ICONS = {
-  '全部':'ph-squares-four','娛樂':'ph-game-controller','美食':'ph-cookie',
-  '體驗':'ph-compass','親子':'ph-heart','特權':'ph-crown'
+  '全部':'🔲','娛樂':'🎮','美食':'🍪',
+  '體驗':'🧭','親子':'❤️','特權':'👑'
 };
 
 const ACHIEVEMENTS = [
-  {id:'a1', title:'新手冒險家',  desc:'完成第一個任務',     icon:'ph-star',           threshold:1,   type:'task_count'},
-  {id:'a2', title:'勤勞小幫手',  desc:'完成 10 個任務',     icon:'ph-hands-clapping', threshold:10,  type:'task_count'},
-  {id:'a3', title:'貝殼收集家',  desc:'累積 50 貝殼幣',     icon:'ph-treasure-chest', threshold:50,  type:'coins'},
-  {id:'a4', title:'連續冒險家',  desc:'連續 7 天完成任務',   icon:'ph-fire',           threshold:7,   type:'streak'},
-  {id:'a5', title:'寵物訓練師',  desc:'寵物進化到毛茸茸',   icon:'ph-paw-print',      threshold:30,  type:'pet_level'},
-  {id:'a6', title:'任務達人',    desc:'完成 50 個任務',     icon:'ph-medal',          threshold:50,  type:'task_count'},
-  {id:'a7', title:'貝殼大亨',    desc:'累積 300 貝殼幣',    icon:'ph-coins',          threshold:300, type:'coins'},
-  {id:'a8', title:'冒險王',      desc:'完成 100 個任務',    icon:'ph-trophy',         threshold:100, type:'task_count'},
-  {id:'a9', title:'傳說冒險家',  desc:'完成 200 個任務',    icon:'ph-crown',          threshold:200, type:'task_count'},
-  {id:'a10',title:'貓王傳說',    desc:'寵物達到傳說等級',   icon:'ph-crown',          threshold:150, type:'pet_level'},
+  {id:'a1', title:'新手冒險家',  desc:'完成第一個任務',     icon:'⭐',   threshold:1,   type:'task_count'},
+  {id:'a2', title:'勤勞小幫手',  desc:'完成 10 個任務',     icon:'👏',   threshold:10,  type:'task_count'},
+  {id:'a3', title:'貝殼收集家',  desc:'累積 50 貝殼幣',     icon:'🧰',   threshold:50,  type:'coins'},
+  {id:'a4', title:'連續冒險家',  desc:'連續 7 天完成任務',   icon:'🔥',   threshold:7,   type:'streak'},
+  {id:'a5', title:'寵物訓練師',  desc:'寵物進化到毛茸茸',   icon:'🐾',   threshold:30,  type:'pet_level'},
+  {id:'a6', title:'任務達人',    desc:'完成 50 個任務',     icon:'🏅',   threshold:50,  type:'task_count'},
+  {id:'a7', title:'貝殼大亨',    desc:'累積 300 貝殼幣',    icon:'💰',   threshold:300, type:'coins'},
+  {id:'a8', title:'冒險王',      desc:'完成 100 個任務',    icon:'🏆',   threshold:100, type:'task_count'},
+  {id:'a9', title:'傳說冒險家',  desc:'完成 200 個任務',    icon:'👑',   threshold:200, type:'task_count'},
+  {id:'a10',title:'貓王傳說',    desc:'寵物達到傳說等級',   icon:'👑',   threshold:150, type:'pet_level'},
 ];
 
 const NAV_CAPTAIN = [
@@ -1654,7 +1654,7 @@ function rewardInventoryCard(r){
   return `<div class="card p-4 ${soldOut?'opacity-50':''}">
     <div class="flex items-center gap-3">
       <div class="w-12 h-12 rounded-xl ${iconBg} flex items-center justify-center shrink-0 relative">
-        ${r.emoji?`<span class="text-2xl">${r.emoji}</span>`:`<i class="ph-fill ${r.icon||'ph-gift'} ${soldOut?'text-gray-600':'text-accent-gold'} text-2xl"></i>`}
+        ${`<span class="text-2xl">${r.emoji||'🎁'}</span>`}
         ${soldOut?'<span class="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">售完</span>':''}
       </div>
       <div class="flex-1 min-w-0">
@@ -1991,7 +1991,7 @@ function kidAchievementsTab(){
       ${earnedList.length>0?`<div class="space-y-2 mb-3">${earnedList.map(a => `
         <div class="card p-3 flex items-center gap-3" style="border-color:rgba(245,158,11,.15)">
           <div class="w-11 h-11 rounded-xl bg-accent-gold/20 flex items-center justify-center shrink-0">
-            <i class="ph-fill ${a.icon} text-accent-gold text-xl"></i>
+            <span class="text-xl">${a.icon}</span>
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
@@ -2007,7 +2007,7 @@ function kidAchievementsTab(){
       ${lockedList.length>0?`<div class="space-y-2">${lockedList.map(a => `
         <div class="card p-3 flex items-center gap-3 opacity-50">
           <div class="w-11 h-11 rounded-xl bg-dark-700 flex items-center justify-center shrink-0">
-            <i class="ph-fill ${a.icon} text-gray-600 text-xl"></i>
+            <span class="text-xl">${a.icon}</span>
           </div>
           <div class="flex-1 min-w-0">
             <p class="font-semibold text-gray-500 text-sm">${a.title}</p>
@@ -2603,7 +2603,7 @@ function kidHome(){
 
     ${nextAch?`
     <div class="card p-4 flex items-center gap-3 card-press" onclick="vibrate(5);switchKidHomeTab(2)" style="border-color:rgba(139,92,246,.2)">
-      <div class="w-10 h-10 rounded-xl bg-accent-purple/20 flex items-center justify-center shrink-0"><i class="ph-fill ${nextAch.icon} text-accent-purple text-xl"></i></div>
+      <div class="w-10 h-10 rounded-xl bg-accent-purple/20 flex items-center justify-center shrink-0"><span class="text-xl">${nextAch.icon}</span></div>
       <div class="flex-1 min-w-0">
         <p class="text-[10px] text-accent-purple font-bold uppercase tracking-widest mb-0.5">下一個成就</p>
         <p class="font-semibold text-white">${nextAch.title}</p>
@@ -2829,7 +2829,7 @@ function kidHistory(){
         <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">成就牆</p>
         ${earnedAch.length>0?`<div class="space-y-2 mb-4">${earnedAch.map(a => `
           <div class="card p-3 flex items-center gap-3" style="border-color:rgba(245,158,11,.25);background:linear-gradient(135deg,rgba(245,158,11,.05),transparent)">
-            <div class="w-10 h-10 rounded-xl bg-accent-gold/20 flex items-center justify-center shrink-0"><i class="ph-fill ${a.icon} text-accent-gold text-xl"></i></div>
+            <div class="w-10 h-10 rounded-xl bg-accent-gold/20 flex items-center justify-center shrink-0"><span class="text-xl">${a.icon}</span></div>
             <div class="flex-1 min-w-0">
               <p class="font-semibold text-white text-sm">${a.title} 🏅</p>
               <p class="text-[10px] text-gray-500">${a.desc}</p>
@@ -2838,7 +2838,7 @@ function kidHistory(){
           </div>`).join('')}</div>`:''}
         ${lockedAch.length>0?`<div class="space-y-2">${lockedAch.map(a => `
           <div class="card p-3 flex items-center gap-3 opacity-60">
-            <div class="w-10 h-10 rounded-xl bg-dark-700 flex items-center justify-center shrink-0"><i class="ph-fill ${a.icon} text-gray-600 text-xl"></i></div>
+            <div class="w-10 h-10 rounded-xl bg-dark-700 flex items-center justify-center shrink-0"><span class="text-xl">${a.icon}</span></div>
             <div class="flex-1 min-w-0">
               <p class="font-semibold text-gray-400 text-sm">${a.title}</p>
               <p class="text-[10px] text-gray-600">${a.desc}</p>
@@ -3291,7 +3291,7 @@ function showAddRewardModal(){
     <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-2">快速套用模板</p>
     <div class="flex gap-1.5 mb-3 overflow-x-auto pb-1" style="-webkit-overflow-scrolling:touch;">
       ${REWARD_CATS.map(c => `<button onclick="rewardTemplateCat='${c}';closeModal();showAddRewardModal()" class="shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${rewardTemplateCat===c?'bg-accent-blue text-white':'bg-dark-700 text-gray-400 hover:text-white'}">
-        <i class="ph ${REWARD_CAT_ICONS[c]||'ph-tag'} mr-0.5"></i>${c}
+        <span class="mr-0.5">${REWARD_CAT_ICONS[c]||'🏷️'}</span>${c}
       </button>`).join('')}
     </div>
     <div class="grid grid-cols-2 gap-2 mb-4 max-h-40 overflow-y-auto pr-1">
@@ -3416,7 +3416,7 @@ async function addReward(){
   try {
     fsLog('writes', 'addReward');
     await db.collection('families').doc(userFamily.id).collection('rewards').add({
-      title, cost, stock, category, emoji, icon: 'ph-gift', isActive: true,
+      title, cost, stock, category, emoji: emoji || '🎁', isActive: true,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: liffUserId
     });
     cacheClear('rewards_' + userFamily.id);
