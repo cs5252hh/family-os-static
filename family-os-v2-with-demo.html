@@ -1523,7 +1523,7 @@ function redemptionReviewCard(r){
   const ago = r.appliedAt ? timeAgo(r.appliedAt) : '';
   return `<div class="card p-4" style="border-color:rgba(245,158,11,.15)">
     <div class="flex items-center gap-3 mb-3">
-      <div class="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center shrink-0">
+      <div class="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center shrink-0">
         ${r.rewardEmoji?'<span class="text-2xl">'+r.rewardEmoji+'</span>':'<i class="ph-fill ph-gift text-orange-400 text-2xl"></i>'}
       </div>
       <div class="flex-1 min-w-0">
@@ -1649,8 +1649,8 @@ function rewardInventoryCard(r){
   const soldOut = (r.stock||0) <= 0;
   const lowStock = (r.stock||0) > 0 && (r.stock||0) < 3;
   const cc = CAT_COLORS[r.category] || 'text-gray-400 bg-dark-700';
-  const ICON_BG = {'娛樂':'bg-blue-500/20','美食':'bg-pink-500/20','體驗':'bg-purple-500/20','親子':'bg-green-500/20','特權':'bg-amber-500/20'};
-  const iconBg = soldOut ? 'bg-dark-700' : (ICON_BG[r.category] || 'bg-accent-gold/10');
+  const ICON_BG = {'娛樂':'bg-blue-500/25','美食':'bg-pink-500/25','體驗':'bg-purple-500/25','親子':'bg-green-500/25','特權':'bg-amber-500/25'};
+  const iconBg = soldOut ? 'bg-dark-700' : (ICON_BG[r.category] || 'bg-accent-gold/20');
   return `<div class="card p-4 ${soldOut?'opacity-50':''}">
     <div class="flex items-center gap-3">
       <div class="w-12 h-12 rounded-xl ${iconBg} flex items-center justify-center shrink-0 relative">
@@ -1887,7 +1887,7 @@ function kidRewardsTab(){
       <div class="space-y-2">${showPending.map(r => {
         const ago = r.appliedAt ? timeAgo(r.appliedAt) : '';
         return `<div class="card p-3 flex items-center gap-3" style="border-color:rgba(245,158,11,.2);background:linear-gradient(135deg,rgba(245,158,11,.04),transparent)">
-          <div class="w-11 h-11 rounded-xl bg-orange-500/10 flex items-center justify-center shrink-0">
+          <div class="w-11 h-11 rounded-xl bg-orange-500/20 flex items-center justify-center shrink-0">
             ${r.rewardEmoji?'<span class="text-xl">'+r.rewardEmoji+'</span>':'<i class="ph-fill ph-gift text-orange-400 text-xl"></i>'}
           </div>
           <div class="flex-1 min-w-0">
@@ -1895,7 +1895,7 @@ function kidRewardsTab(){
             <p class="text-[10px] text-gray-600 mt-0.5">${ago ? ago.replace('前','')+'前申請' : '申請中'} · ${r.cost||0} 🐚</p>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
-            <span class="badge text-[9px] text-orange-400 bg-orange-500/10 border border-orange-500/20">審核中</span>
+            <span class="badge text-[9px] text-orange-400 bg-orange-500/15 border border-orange-500/20">審核中</span>
             <span class="pending-dots flex gap-0.5"><span></span><span></span><span></span></span>
           </div>
         </div>`;
@@ -1909,7 +1909,7 @@ function kidRewardsTab(){
       ${approved.length>0?`<div class="space-y-2">${showApproved.map(r => {
         const ago = r.reviewedAt ? timeAgo(r.reviewedAt) : (r.appliedAt ? timeAgo(r.appliedAt) : '');
         return `<div class="card p-4 flex items-center gap-3 card-press" style="border-color:rgba(245,158,11,.15);background:linear-gradient(135deg,rgba(245,158,11,.06),transparent)">
-          <div class="w-12 h-12 rounded-xl bg-accent-gold/10 flex items-center justify-center shrink-0">
+          <div class="w-12 h-12 rounded-xl bg-accent-gold/20 flex items-center justify-center shrink-0">
             ${r.rewardEmoji?'<span class="text-2xl">'+r.rewardEmoji+'</span>':'<i class="ph-fill ph-ticket text-accent-gold text-2xl"></i>'}
           </div>
           <div class="flex-1 min-w-0">
@@ -1990,7 +1990,7 @@ function kidAchievementsTab(){
       <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3"><i class="ph ph-medal mr-1"></i>成就牆（${earnedList.length}/${achProgress.length}）</p>
       ${earnedList.length>0?`<div class="space-y-2 mb-3">${earnedList.map(a => `
         <div class="card p-3 flex items-center gap-3" style="border-color:rgba(245,158,11,.15)">
-          <div class="w-11 h-11 rounded-xl bg-accent-gold/15 flex items-center justify-center shrink-0">
+          <div class="w-11 h-11 rounded-xl bg-accent-gold/20 flex items-center justify-center shrink-0">
             <i class="ph-fill ${a.icon} text-accent-gold text-xl"></i>
           </div>
           <div class="flex-1 min-w-0">
@@ -2603,7 +2603,7 @@ function kidHome(){
 
     ${nextAch?`
     <div class="card p-4 flex items-center gap-3 card-press" onclick="vibrate(5);switchKidHomeTab(2)" style="border-color:rgba(139,92,246,.2)">
-      <div class="w-10 h-10 rounded-xl bg-accent-purple/10 flex items-center justify-center shrink-0"><i class="ph-fill ${nextAch.icon} text-accent-purple text-xl"></i></div>
+      <div class="w-10 h-10 rounded-xl bg-accent-purple/20 flex items-center justify-center shrink-0"><i class="ph-fill ${nextAch.icon} text-accent-purple text-xl"></i></div>
       <div class="flex-1 min-w-0">
         <p class="text-[10px] text-accent-purple font-bold uppercase tracking-widest mb-0.5">下一個成就</p>
         <p class="font-semibold text-white">${nextAch.title}</p>
@@ -2829,7 +2829,7 @@ function kidHistory(){
         <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">成就牆</p>
         ${earnedAch.length>0?`<div class="space-y-2 mb-4">${earnedAch.map(a => `
           <div class="card p-3 flex items-center gap-3" style="border-color:rgba(245,158,11,.25);background:linear-gradient(135deg,rgba(245,158,11,.05),transparent)">
-            <div class="w-10 h-10 rounded-xl bg-accent-gold/15 flex items-center justify-center shrink-0"><i class="ph-fill ${a.icon} text-accent-gold text-xl"></i></div>
+            <div class="w-10 h-10 rounded-xl bg-accent-gold/20 flex items-center justify-center shrink-0"><i class="ph-fill ${a.icon} text-accent-gold text-xl"></i></div>
             <div class="flex-1 min-w-0">
               <p class="font-semibold text-white text-sm">${a.title} 🏅</p>
               <p class="text-[10px] text-gray-500">${a.desc}</p>
@@ -2966,7 +2966,7 @@ function kidHistory(){
         <div class="space-y-2">${(rewardHistoryExpanded?used:used.slice(0,10)).map(r => {
           const ago = r.usedAt ? timeAgo(r.usedAt) : (r.appliedAt ? timeAgo(r.appliedAt) : '');
           return `<div class="card p-3 flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-accent-green/10 flex items-center justify-center shrink-0">
+            <div class="w-10 h-10 rounded-xl bg-accent-green/20 flex items-center justify-center shrink-0">
               ${r.rewardEmoji?'<span class="text-xl">'+r.rewardEmoji+'</span>':'<i class="ph-fill ph-check-circle text-accent-green text-xl"></i>'}
             </div>
             <div class="flex-1 min-w-0">
