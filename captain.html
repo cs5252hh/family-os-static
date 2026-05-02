@@ -499,7 +499,7 @@ async function initLiff(){
     await liff.init({ liffId: '2009808286-3qfR7gLt' });
     if(!liff.isLoggedIn()){
       if(liff.isInClient()){ liff.login(); return; }
-      showDemoModeOption(); return;
+      showLoginScreen(); return;
     }
     const profile = await liff.getProfile();
     liffUserId = profile.userId;
@@ -507,11 +507,11 @@ async function initLiff(){
     await checkUserSetup();
   } catch(e){
     console.error('LIFF 初始化失敗:', e);
-    showDemoModeOption();
+    showLoginScreen();
   }
 }
 
-function showDemoModeOption(){
+function showLoginScreen(){
   document.getElementById('loadingScreen').innerHTML = `
     <div class="text-center px-6">
       <img src="island-logo.png" alt="AdventureKids" style="width:80px;height:80px;" class="mb-4 mx-auto">
@@ -525,16 +525,10 @@ function showDemoModeOption(){
           <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#4285F4" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#34A853" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 000 24c0 3.77.9 7.35 2.56 10.53l7.97-5.94z"/><path fill="#EA4335" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.94C6.51 42.62 14.62 48 24 48z"/></svg>
           <span class="font-medium">使用 Google 帳號登入</span>
         </button>
-        <div class="flex items-center my-4">
-          <div class="flex-1 border-t border-dark-700"></div>
-          <span class="px-4 text-gray-500 text-sm">或使用開發模式</span>
-          <div class="flex-1 border-t border-dark-700"></div>
-        </div>
-        <button onclick="enterDemoMode('captain')" class="w-full bg-blue-600 hover:bg-blue-700 rounded-lg py-3 px-4 transition-colors text-lg">👨‍✈️ 船長模式 (Demo)</button>
       </div>
-      <p class="text-xs text-gray-500 mb-4">開發模式使用 demo-family 資料</p>
-      <div class="border-t border-dark-700 pt-4">
+      <div class="border-t border-dark-700 pt-4 space-y-2">
         <a href="kid.html" class="text-sm text-accent-gold hover:text-amber-300 transition-all flex items-center justify-center gap-2">🧒 我是小冒險家 → 前往冒險家登入</a>
+        <a href="index.html" class="text-xs text-gray-500 hover:text-gray-300 transition-all flex items-center justify-center gap-1">← 回到首頁</a>
       </div>
     </div>`;
 }
@@ -568,102 +562,6 @@ async function loginWithGoogle(){
       alert('Google 登入失敗: ' + e.message);
     }
   }
-}
-
-async function enterDemoMode(role){
-  liffUserId = role === 'captain' ? 'demo-captain' : role === 'kid2' ? 'demo-kid2' : 'demo-kid1';
-  document.getElementById('loadingScreen').innerHTML = `
-    <div class="text-center">
-      <div class="loading-spinner mx-auto mb-4"></div>
-      <p class="text-lg font-medium">🌊 載入${role === 'captain' ? '船長' : role === 'kid2' ? '小美' : '小明'}模式...</p>
-      <p id="loadingText" class="text-sm text-gray-400 mt-2">正在連接資料庫...</p>
-    </div>`;
-  // 自動確保 demo 資料存在
-  await ensureDemoData();
-  await checkUserSetup();
-}
-
-// 確保 demo-family 包含 demo-kid2
-async function ensureDemoData(){
-  try {
-    const kid2Doc = await db.collection('users').doc('demo-kid2').get();
-    if(!kid2Doc.exists){
-      fsLog('writes', 'auto-create demo-kid2');
-      await db.collection('users').doc('demo-kid2').set({
-        familyId: 'demo-family', role: 'kid', name: '小美',
-        coins: 0, petEXP: 0, streak: 0,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        lastActiveAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    }
-    // 確保 members 陣列包含 demo-kid2
-    const famDoc = await db.collection('families').doc('demo-family').get();
-    if(famDoc.exists){
-      const members = famDoc.data().members || [];
-      if(!members.includes('demo-kid2')){
-        fsLog('writes', 'add demo-kid2 to demo-family members');
-        await db.collection('families').doc('demo-family').update({
-          members: firebase.firestore.FieldValue.arrayUnion('demo-kid2')
-        });
-        cacheClear('family_demo-family');
-      }
-    }
-    // 確保 demo 有兌換紀錄（展示票券功能）
-    const famRef = db.collection('families').doc('demo-family');
-    const rSnap = await famRef.collection('redemptions').limit(1).get();
-    if(rSnap.empty){
-      fsLog('writes', 'auto-create demo redemptions');
-      const now = firebase.firestore.Timestamp.now();
-      const ago = (h) => new firebase.firestore.Timestamp(now.seconds - h*3600, 0);
-      const batch = db.batch();
-      // pending（審核中）
-      batch.set(famRef.collection('redemptions').doc('demo-r1'), {
-        rewardId:'demo-rw1', rewardTitle:'週末打電動 1 小時', rewardEmoji:'🎮', cost:30,
-        userId:'demo-kid1', status:'pending', appliedAt:ago(2)
-      });
-      batch.set(famRef.collection('redemptions').doc('demo-r2'), {
-        rewardId:'demo-rw2', rewardTitle:'選一部電影看', rewardEmoji:'🎬', cost:25,
-        userId:'demo-kid1', status:'pending', appliedAt:ago(5)
-      });
-      // approved（已核准、可使用）
-      batch.set(famRef.collection('redemptions').doc('demo-r3'), {
-        rewardId:'demo-rw3', rewardTitle:'去公園玩 1 小時', rewardEmoji:'🏖️', cost:20,
-        userId:'demo-kid1', status:'approved', appliedAt:ago(48),
-        reviewedAt:ago(24), reviewedBy:'demo-captain'
-      });
-      batch.set(famRef.collection('redemptions').doc('demo-r4'), {
-        rewardId:'demo-rw4', rewardTitle:'買一個小玩具', rewardEmoji:'🧸', cost:50,
-        userId:'demo-kid1', status:'approved', appliedAt:ago(72),
-        reviewedAt:ago(48), reviewedBy:'demo-captain'
-      });
-      // used + rejected（歷程用）
-      batch.set(famRef.collection('redemptions').doc('demo-r5'), {
-        rewardId:'demo-rw5', rewardTitle:'吃冰淇淋', rewardEmoji:'🍦', cost:15,
-        userId:'demo-kid1', status:'used', appliedAt:ago(168),
-        reviewedAt:ago(160), usedAt:ago(144), reviewedBy:'demo-captain'
-      });
-      batch.set(famRef.collection('redemptions').doc('demo-r6'), {
-        rewardId:'demo-rw6', rewardTitle:'買遊戲點數', rewardEmoji:'💎', cost:100,
-        userId:'demo-kid1', status:'rejected', appliedAt:ago(240),
-        reviewedAt:ago(200), reviewedBy:'demo-captain'
-      });
-      await batch.commit();
-    }
-    // 遷移既有 demo kids：補上 kidCode, avatar, pin, hasPin 欄位
-    const kid1Doc = await db.collection('users').doc('demo-kid1').get();
-    if(kid1Doc.exists && !kid1Doc.data().kidCode){
-      fsLog('writes', 'migrate demo-kid1 with kidCode fields');
-      await db.collection('users').doc('demo-kid1').update({
-        kidCode:'KID-DEMO01', avatar:'🧒', pin:null, hasPin:false, userId:'demo-kid1', role:'kid'
-      });
-    }
-    if(kid2Doc.exists && !kid2Doc.data().kidCode){
-      fsLog('writes', 'migrate demo-kid2 with kidCode fields');
-      await db.collection('users').doc('demo-kid2').update({
-        kidCode:'KID-DEMO02', avatar:'👧', pin:null, hasPin:false, userId:'demo-kid2', role:'kid'
-      });
-    }
-  } catch(e){ console.warn('ensureDemoData:', e); }
 }
 
 async function checkUserSetup(){
@@ -2201,6 +2099,11 @@ async function createKid(){
       members: firebase.firestore.FieldValue.arrayUnion(kidId)
     });
     cacheClear('family_'+userFamily.id);
+    // 即時更新本地狀態，讓任務頁等頁面能立刻看到新小孩
+    const localKid = { id: kidId, ...kidData, createdAt: { seconds: Math.floor(Date.now()/1000) } };
+    familyData.members[kidId] = localKid;
+    if(!userFamily.members.includes(kidId)) userFamily.members.push(kidId);
+    cacheSet('user_' + kidId, localKid);
     addKidPinOn = false;
     showKidCreatedModal(name, avatar, kidCode, pin);
     showToast('小冒險家建立成功！','green');
@@ -2494,6 +2397,9 @@ async function confirmDeleteKid(kidId){
     await db.collection('users').doc(kidId).delete();
     cacheClear('family_'+userFamily.id);
     cacheSet('user_'+kidId, null);
+    // 即時更新本地狀態
+    delete familyData.members[kidId];
+    userFamily.members = (userFamily.members||[]).filter(id => id !== kidId);
     closeModal();
     showToast('已刪除小冒險家','green');
   } catch(e){ console.error('deleteKid error:', e); showToast('刪除失敗：'+e.message,'red'); }
@@ -3548,10 +3454,7 @@ function captainAccount(){
   let loginIcon = '<i class="ph ph-question text-gray-400"></i>';
   let loginDetailLabel = '';
   let loginDetailValue = '';
-  if(uid === 'demo-captain'){
-    loginMethod = 'Demo 模式';
-    loginIcon = '<i class="ph-fill ph-flask text-purple-400"></i>';
-  } else if(uid.startsWith('google_')){
+  if(uid.startsWith('google_')){
     loginMethod = 'Google 登入';
     loginIcon = '<i class="ph-bold ph-google-logo text-red-400"></i>';
     const authUser = firebase.auth().currentUser;
@@ -3776,7 +3679,7 @@ function logout(){
   }
   document.getElementById('mainApp').classList.add('hidden');
   document.getElementById('loadingScreen').classList.remove('hidden');
-  showDemoModeOption();
+  showLoginScreen();
 }
 
 // ══════════════════════════════════════
