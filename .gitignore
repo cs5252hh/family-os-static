@@ -1,2 +1,31 @@
-.vercel
-.env*.local
+# macOS
+.DS_Store
+
+# Logs
+*.log
+firebase-debug.log
+deploy-line.log
+
+# Backup data (含 service account key、資料庫備份)
+adventurekids-backup/
+
+# Firebase Functions
+functions/node_modules/
+functions/.env
+functions/.env.local
+
+# Service account keys（雙保險，名稱比對）
+serviceAccountKey.json
+*-firebase-adminsdk-*.json
+
+# Editor
+.vscode/
+.idea/
+
+# Vercel
+.vercel/
+
+# Environment variables (root level)
+.env
+.env.local
+.env.*.local

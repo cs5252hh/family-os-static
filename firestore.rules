@@ -1,0 +1,126 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==================== Helpers ====================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isMe(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function userData(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+
+    function isCaptain() {
+      return isSignedIn() && userData(request.auth.uid).role == 'captain';
+    }
+
+    function inFamily(familyId) {
+      return isSignedIn() && userData(request.auth.uid).familyId == familyId;
+    }
+
+    // 防呆：禁止前端直接改特定欄位（必須走 Cloud Function）
+    function isNotChangingProtectedFields(protectedFields) {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(protectedFields);
+    }
+
+    // ==================== users ====================
+
+    match /users/{userId} {
+      // 自己可讀寫，同家庭成員可讀
+      allow read: if isMe(userId)
+        || (isSignedIn()
+            && resource.data.familyId != null
+            && userData(request.auth.uid).familyId == resource.data.familyId);
+
+      // 自己可改自己的非保護欄位
+      // coins / petEXP / streak / linkedAccounts / role / familyId 必須走 Cloud Function
+      allow update: if isMe(userId)
+        && isNotChangingProtectedFields([
+          'coins', 'petEXP', 'streak',
+          'linkedAccounts', 'role', 'familyId',
+          'uid', 'schemaVersion'
+        ]);
+
+      // create / delete 一律走 Cloud Function
+      allow create, delete: if false;
+    }
+
+    // ==================== families ====================
+
+    match /families/{familyId} {
+      allow read: if isSignedIn()
+        && request.auth.uid in resource.data.members;
+
+      // captain 才能改 family，且必須是成員
+      allow update: if isCaptain()
+        && request.auth.uid in resource.data.members
+        && isNotChangingProtectedFields(['members', 'schemaVersion']);
+
+      allow create, delete: if false;
+    }
+
+    // ==================== families/{familyId}/tasks ====================
+
+    match /families/{familyId}/tasks/{taskId} {
+      allow read: if inFamily(familyId);
+      // captain 可建立 / 修改 / 刪除任務
+      allow create, delete: if isCaptain() && inFamily(familyId);
+      // kid 只能更新自己被指派的任務的狀態（提交、完成）
+      allow update: if inFamily(familyId)
+        && (isCaptain() || resource.data.assignedTo == request.auth.uid);
+    }
+
+    // ==================== families/{familyId}/rewards ====================
+
+    match /families/{familyId}/rewards/{rewardId} {
+      allow read: if inFamily(familyId);
+      allow write: if isCaptain() && inFamily(familyId);
+    }
+
+    // ==================== families/{familyId}/redemptions ====================
+
+    match /families/{familyId}/redemptions/{redemptionId} {
+      allow read: if inFamily(familyId);
+      // 任何成員都可申請（kid 申請兌換）
+      allow create: if inFamily(familyId);
+      // 只有 captain 可審核 / 刪除
+      allow update, delete: if isCaptain() && inFamily(familyId);
+    }
+
+    // ==================== families/{familyId}/reminders ====================
+
+    match /families/{familyId}/reminders/{reminderId} {
+      allow read: if inFamily(familyId);
+      allow write: if isCaptain() && inFamily(familyId);
+    }
+
+    // ==================== families/{familyId}/children (legacy) ====================
+    // demo-family 還在用，先保留
+
+    match /families/{familyId}/children/{childId} {
+      allow read: if inFamily(familyId);
+      allow write: if isCaptain() && inFamily(familyId);
+    }
+
+    // ==================== authIndex ====================
+    // 只有 server (Admin SDK) 可讀寫，前端完全禁止
+
+    match /authIndex/{indexId} {
+      allow read, write: if false;
+    }
+
+    // ==================== Default deny ====================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
