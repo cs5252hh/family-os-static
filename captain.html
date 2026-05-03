@@ -3465,11 +3465,12 @@ function captainAccount(){
     const authUser = firebase.auth().currentUser;
     if(authUser?.email){ loginDetailLabel = '帳號'; loginDetailValue = authUser.email; }
     else if(authUser?.displayName){ loginDetailLabel = '名稱'; loginDetailValue = authUser.displayName; }
-  } else if(uid.startsWith('line_')){
+  } else if(uid.startsWith('kid_')){
+    loginMethod = '小冒險家';
+    loginIcon = '🧒';
+  } else if(uid && !uid.startsWith('google_')){
     loginMethod = 'LINE 登入';
     loginIcon = '<i class="ph-bold ph-chat-circle-dots text-green-400"></i>';
-    loginDetailLabel = 'LINE ID';
-    loginDetailValue = uid.replace('line_','');
   }
 
   const emojiOptions = ['👨‍✈️','👩‍✈️','🧑‍✈️','🦸','🦸‍♀️','🧙','🧙‍♀️','🦊','🐻','🐯','🦁','🐼'];
