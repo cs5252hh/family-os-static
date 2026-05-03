@@ -471,8 +471,33 @@ function updateLoadingText(text){
 // ══════════════════════════════════════
 // LIFF & Auth
 // ══════════════════════════════════════
+let liffInited = false;
+
 async function initLiff(){
-  // Check if arriving from kid.html with ?mode=kid
+  // Step 0: 接住 Google signInWithRedirect 回來的結果
+  try {
+    const redirectResult = await firebase.auth().getRedirectResult();
+    if(redirectResult && redirectResult.user){
+      liffUserId = 'google_' + redirectResult.user.uid;
+      // 恢復 loading 畫面
+      document.getElementById('loadingScreen').innerHTML = `
+        <div class="text-center">
+          <div class="loading-spinner mx-auto mb-4"></div>
+          <p class="text-lg font-medium">🌊 AdventureKids 啟動中...</p>
+          <p id="loadingText" class="text-sm text-gray-400 mt-2">Google 登入成功，載入資料中...</p>
+        </div>`;
+      await checkUserSetup();
+      return;
+    }
+  } catch(e){
+    console.error('Google redirect 登入失敗:', e);
+    if(e.code === 'auth/unauthorized-domain'){
+      alert('此網域尚未加入 Firebase Auth 授權清單。\n請到 Firebase Console → Authentication → Settings → Authorized domains 新增此網域。');
+    }
+    // 繼續正常流程，顯示登入畫面
+  }
+
+  // Step 1: 檢查 kid mode
   const params = new URLSearchParams(window.location.search);
   if(params.get('mode') === 'kid'){
     const kidId = sessionStorage.getItem('currentKidId');
@@ -488,15 +513,16 @@ async function initLiff(){
         return;
       }
     } else {
-      // No session — redirect back to kid.html
       window.location.href = 'kid.html';
       return;
     }
   }
 
+  // Step 2: LIFF 初始化
   try {
     updateLoadingText('連接 LINE...');
     await liff.init({ liffId: '2009808286-3qfR7gLt' });
+    liffInited = true;
     if(!liff.isLoggedIn()){
       if(liff.isInClient()){ liff.login(); return; }
       showLoginScreen(); return;
@@ -534,34 +560,13 @@ function showLoginScreen(){
 }
 
 function loginWithLine(){
-  if(typeof liff !== 'undefined' && liff.isReady) liff.login();
-  else alert('LINE 登入暫時無法使用，請使用開發模式或從 LINE App 開啟');
+  if(liffInited) liff.login();
+  else alert('LINE SDK 尚未準備好，請重新整理頁面');
 }
 
-async function loginWithGoogle(){
-  try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    const result = await firebase.auth().signInWithPopup(provider);
-    liffUserId = 'google_' + result.user.uid;
-
-    // Restore loading screen
-    document.getElementById('loadingScreen').innerHTML = `
-      <div class="text-center">
-        <div class="loading-spinner mx-auto mb-4"></div>
-        <p class="text-lg font-medium">🌊 AdventureKids 啟動中...</p>
-        <p id="loadingText" class="text-sm text-gray-400 mt-2">Google 登入成功，載入資料中...</p>
-      </div>`;
-
-    await checkUserSetup();
-  } catch(e){
-    console.error('Google 登入失敗:', e);
-    if(e.code === 'auth/popup-closed-by-user') return;
-    if(e.code === 'auth/unauthorized-domain'){
-      alert('此網域尚未加入 Firebase Auth 授權清單。\\n請到 Firebase Console → Authentication → Settings → Authorized domains 新增此網域。');
-    } else {
-      alert('Google 登入失敗: ' + e.message);
-    }
-  }
+function loginWithGoogle(){
+  const provider = new firebase.auth.GoogleAuthProvider();
+  firebase.auth().signInWithRedirect(provider);
 }
 
 async function checkUserSetup(){
