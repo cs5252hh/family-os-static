@@ -77,19 +77,19 @@ body{background:#13141C;color:#fff;margin:0;min-height:100dvh;}
 // LIFF 登入完會跳回這裡（LIFF endpoint），偵測是否需要轉回 captain.html
 (async function(){
   try {
-    const returnTo = sessionStorage.getItem('liffLoginReturn');
+    const returnTo = localStorage.getItem('liffLoginReturn');
     if(!returnTo) return; // 沒有 flag，正常顯示角色選擇頁
     await liff.init({ liffId: '2009808286-3qfR7gLt' });
     if(liff.isLoggedIn()){
-      sessionStorage.removeItem('liffLoginReturn');
+      localStorage.removeItem('liffLoginReturn');
       window.location.href = returnTo === 'captain' ? 'captain.html' : returnTo + '.html';
     } else {
       // 登入沒成功，清掉 flag，讓使用者看到角色選擇頁
-      sessionStorage.removeItem('liffLoginReturn');
+      localStorage.removeItem('liffLoginReturn');
     }
   } catch(e){
     console.warn('LIFF redirect check failed:', e);
-    sessionStorage.removeItem('liffLoginReturn');
+    localStorage.removeItem('liffLoginReturn');
   }
 })();
 </script>
