@@ -79,10 +79,18 @@ body{background:#13141C;color:#fff;margin:0;min-height:100dvh;}
   try {
     await liff.init({ liffId: '2009808286-3qfR7gLt' });
     if(liff.isLoggedIn()){
-      const returnTo = localStorage.getItem('liffLoginReturn');
+      const raw = localStorage.getItem('liffLoginReturn');
       localStorage.removeItem('liffLoginReturn');
-      if(returnTo){
-        window.location.href = returnTo === 'captain' ? 'captain.html' : returnTo + '.html';
+      if(raw){
+        try {
+          const flag = JSON.parse(raw);
+          // 只在 2 分鐘內設的 flag 才跳轉，防止舊 flag 干擾
+          if(flag.to && flag.ts && (Date.now() - flag.ts < 120000)){
+            window.location.href = flag.to === 'captain' ? 'captain.html' : flag.to + '.html';
+          }
+        } catch(e){
+          // 舊格式的純字串 flag，忽略（過期）
+        }
       }
     } else {
       localStorage.removeItem('liffLoginReturn');

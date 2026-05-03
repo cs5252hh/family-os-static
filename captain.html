@@ -524,7 +524,7 @@ async function initLiff(){
     await liff.init({ liffId: '2009808286-3qfR7gLt' });
     liffInited = true;
     if(!liff.isLoggedIn()){
-      if(liff.isInClient()){ localStorage.setItem('liffLoginReturn','captain'); liff.login(); return; }
+      if(liff.isInClient()){ localStorage.setItem('liffLoginReturn',JSON.stringify({to:'captain',ts:Date.now()})); liff.login(); return; }
       showLoginScreen(); return;
     }
     const profile = await liff.getProfile();
@@ -560,7 +560,7 @@ function showLoginScreen(){
 }
 
 function loginWithLine(){
-  if(liffInited){ localStorage.setItem('liffLoginReturn','captain'); liff.login(); }
+  if(liffInited){ localStorage.setItem('liffLoginReturn',JSON.stringify({to:'captain',ts:Date.now()})); liff.login(); }
   else alert('LINE SDK 尚未準備好，請重新整理頁面');
 }
 
