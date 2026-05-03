@@ -652,33 +652,24 @@ function loginWithLine(){
   else alert('LINE SDK 尚未準備好，請重新整理頁面');
 }
 
-async function loginWithGoogle(){
+function loginWithGoogle(){
+  console.log('[DEBUG] loginWithGoogle called, liffInited=' + liffInited);
   const provider = new firebase.auth.GoogleAuthProvider();
   // LINE 內建瀏覽器不支援 popup，改用 redirect；桌面瀏覽器用 popup 更順暢
   if(liffInited && liff.isInClient()){
     firebase.auth().signInWithRedirect(provider);
   } else {
-    try {
-      const result = await firebase.auth().signInWithPopup(provider);
+    firebase.auth().signInWithPopup(provider).then(function(result){
       if(result && result.user){
         liffUserId = 'google_' + result.user.uid;
-        document.getElementById('loadingScreen').innerHTML = `
-          <div class="text-center">
-            <div class="loading-spinner mx-auto mb-4"></div>
-            <p class="text-lg font-medium">🌊 AdventureKids 啟動中...</p>
-            <p id="loadingText" class="text-sm text-gray-400 mt-2">Google 登入成功，載入資料中...</p>
-          </div>`;
-        await checkUserSetup();
+        document.getElementById('loadingScreen').innerHTML = '<div class="text-center"><div class="loading-spinner mx-auto mb-4"></div><p class="text-lg font-medium">🌊 AdventureKids 啟動中...</p><p id="loadingText" class="text-sm text-gray-400 mt-2">Google 登入成功，載入資料中...</p></div>';
+        checkUserSetup();
       }
-    } catch(e){
+    }).catch(function(e){
       console.error('Google 登入失敗:', e);
       if(e.code === 'auth/popup-closed-by-user') return;
-      if(e.code === 'auth/unauthorized-domain'){
-        alert('此網域尚未加入 Firebase Auth 授權清單。');
-      } else {
-        showToast('Google 登入失敗：' + e.message, 'red');
-      }
-    }
+      alert('Google 登入失敗：' + (e.message || e.code || '未知錯誤'));
+    });
   }
 }
 
