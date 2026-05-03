@@ -182,6 +182,17 @@ function fsLog(type, desc='') {
 // [P2] localStorage 快取層
 // ══════════════════════════════════════
 const CACHE_TTL = 10 * 60 * 1000; // 10 min
+
+// ══ 每個家庭的數量上限（防暴力測試）══
+const LIMITS = {
+  TASKS: 200,         // 任務總數
+  REWARDS: 50,        // 獎勵總數
+  REMINDERS_ACTIVE: 10, // 啟用中的提醒
+  KIDS: 10,           // 小冒險家人數
+  PENDING_REDEMPTIONS: 30, // 待審核兌換
+  TITLE_MAX_LEN: 100, // 標題最大字數
+  MESSAGE_MAX_LEN: 200, // 提醒訊息最大字數
+};
 function cacheGet(key, maxAgeMs = CACHE_TTL) {
   try {
     const raw = localStorage.getItem('fos_' + key);
@@ -1500,7 +1511,7 @@ function captainTasks(){
       <div class="card p-4">
         <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-3">新增任務</p>
         <div class="space-y-3">
-          <input id="nTitle" type="text" placeholder="任務名稱…" class="w-full border rounded-xl px-4 py-3 text-sm">
+          <input id="nTitle" type="text" maxlength="100" placeholder="任務名稱…" class="w-full border rounded-xl px-4 py-3 text-sm">
           <div>
             <p class="text-xs text-gray-400 mb-2">指派給（可多選）</p>
             <div id="nKidSelect" class="flex flex-wrap gap-2">
@@ -1516,7 +1527,7 @@ function captainTasks(){
               <option value="創意">創意</option><option value="關懷">關懷</option>
               <option value="才藝">才藝</option><option value="其他">其他</option>
             </select>
-            <input id="nPts" type="number" value="20" placeholder="貝殼幣" class="border rounded-xl px-3 py-3 text-sm text-center">
+            <input id="nPts" type="number" value="20" min="1" max="9999" placeholder="貝殼幣" class="border rounded-xl px-3 py-3 text-sm text-center">
           </div>
           <button id="addTaskBtn" onclick="vibrate(10);addTask()" class="w-full bg-accent-blue text-white px-5 py-3 rounded-xl text-sm font-bold transition-all active:scale-90 hover:brightness-110 flex items-center justify-center gap-1 opacity-50 cursor-not-allowed" disabled>
             <i class="ph-fill ph-plus"></i> 新增任務
@@ -1747,7 +1758,7 @@ function captainReminders(){
         </div>
         <div class="mb-3">
           <p class="text-xs text-gray-500 mb-2">提醒內容</p>
-          <textarea id="noticeText" rows="2" placeholder="例：今天要記得跟同學打招呼！"
+          <textarea id="noticeText" rows="2" maxlength="200" placeholder="例：今天要記得跟同學打招呼！"
             oninput="var p=document.getElementById('pText');if(p)p.textContent=this.value||'輸入提醒內容…'"
             class="w-full border rounded-xl px-4 py-3 text-sm resize-none"></textarea>
         </div>
@@ -2077,9 +2088,11 @@ function pinAutoFocus(cur, nextId){
 }
 
 async function createKid(){
-  const name = (document.getElementById('akName')?.value||'').trim();
-  const avatar = document.getElementById('akAvatar')?.value || '🧒';
+  const name = (document.getElementById('akName')?.value||'').trim().slice(0, LIMITS.TITLE_MAX_LEN);
+  const avatar = (document.getElementById('akAvatar')?.value||'').slice(0,4) || '🧒';
   if(!name){ showToast('請輸入名字','gold'); return; }
+  const kidCount = (userFamily.members||[]).filter(id => id.startsWith('kid_')).length;
+  if(kidCount >= LIMITS.KIDS){ showToast(`小冒險家已達上限 ${LIMITS.KIDS} 位`,'gold'); return; }
   let pin = null;
   if(addKidPinOn){
     const p1=document.getElementById('akPin1')?.value||'';
@@ -3042,10 +3055,12 @@ function updateAddTaskBtn(){
 }
 
 async function addTask(){
-  const title = document.getElementById('nTitle')?.value.trim();
+  const title = (document.getElementById('nTitle')?.value||'').trim().slice(0, LIMITS.TITLE_MAX_LEN);
   const category = document.getElementById('nCat')?.value;
-  const reward = parseInt(document.getElementById('nPts')?.value) || 10;
+  const reward = Math.min(Math.max(parseInt(document.getElementById('nPts')?.value) || 10, 1), 9999);
   if(!title){ showToast('請輸入任務名稱','gold'); return; }
+  const currentCount = (familyData.tasks||[]).length;
+  if(currentCount >= LIMITS.TASKS){ showToast(`任務已達上限 ${LIMITS.TASKS} 個，請先完成或刪除舊任務`,'gold'); return; }
 
   const selectedKids = [...document.querySelectorAll('#nKidSelect .kid-chip.selected')].map(b => b.dataset.kid);
   if(selectedKids.length === 0){ showToast('請選擇至少一位小冒險家','gold'); return; }
@@ -3118,6 +3133,8 @@ async function redeemReward(rid){
   const r = familyData.rewards.find(r => r.id===rid);
   if(!r || (r.stock||0) <= 0){ showToast('此獎勵已售完','red'); return; }
   if((currentUser?.coins||0) < (r.cost||0)){ showToast('貝殼幣不足 🐚','red'); return; }
+  const pendingCount = (familyData.redemptions||[]).filter(d => d.status==='pending').length;
+  if(pendingCount >= LIMITS.PENDING_REDEMPTIONS){ showToast(`待審核兌換已達上限 ${LIMITS.PENDING_REDEMPTIONS} 筆，請先處理`,'gold'); return; }
   try {
     // [P4] 已使用 batch — 兌換申請 + 扣幣 + 扣庫存
     const batch = db.batch();
@@ -3238,15 +3255,15 @@ function showAddRewardModal(){
     <div class="space-y-3">
       <div class="flex gap-2">
         <input id="mrEmoji" type="text" placeholder="🎁" class="w-14 border rounded-xl px-2 py-3 text-sm text-center" maxlength="2">
-        <input id="mrTitle" type="text" placeholder="獎勵名稱" class="flex-1 border rounded-xl px-4 py-3 text-sm">
+        <input id="mrTitle" type="text" maxlength="100" placeholder="獎勵名稱" class="flex-1 border rounded-xl px-4 py-3 text-sm">
       </div>
       <div class="grid grid-cols-2 gap-2">
         <div class="relative">
-          <input id="mrCost" type="number" value="50" placeholder="貝殼幣" class="w-full border rounded-xl px-3 py-3 text-sm text-center">
+          <input id="mrCost" type="number" value="50" min="1" max="9999" placeholder="貝殼幣" class="w-full border rounded-xl px-3 py-3 text-sm text-center">
           <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">🐚</span>
         </div>
         <div class="relative">
-          <input id="mrStock" type="number" value="5" placeholder="庫存" class="w-full border rounded-xl px-3 py-3 text-sm text-center">
+          <input id="mrStock" type="number" value="5" min="1" max="999" placeholder="庫存" class="w-full border rounded-xl px-3 py-3 text-sm text-center">
           <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">個</span>
         </div>
       </div>
@@ -3337,12 +3354,14 @@ async function deleteReward(rid){
 }
 
 async function addReward(){
-  const title = document.getElementById('mrTitle')?.value.trim();
-  const cost = parseInt(document.getElementById('mrCost')?.value) || 30;
-  const stock = parseInt(document.getElementById('mrStock')?.value) || 5;
+  const title = (document.getElementById('mrTitle')?.value||'').trim().slice(0, LIMITS.TITLE_MAX_LEN);
+  const cost = Math.min(Math.max(parseInt(document.getElementById('mrCost')?.value) || 30, 1), 9999);
+  const stock = Math.min(Math.max(parseInt(document.getElementById('mrStock')?.value) || 5, 1), 999);
   const category = document.getElementById('mrCat')?.value;
-  const emoji = document.getElementById('mrEmoji')?.value.trim() || '🎁';
+  const emoji = (document.getElementById('mrEmoji')?.value||'').trim().slice(0,4) || '🎁';
   if(!title){ showToast('請輸入獎勵名稱','gold'); return; }
+  const currentCount = (familyData.rewards||[]).length;
+  if(currentCount >= LIMITS.REWARDS){ showToast(`獎勵已達上限 ${LIMITS.REWARDS} 個，請先刪除舊獎勵`,'gold'); return; }
   try {
     fsLog('writes', 'addReward');
     await db.collection('families').doc(userFamily.id).collection('rewards').add({
@@ -3355,11 +3374,11 @@ async function addReward(){
 }
 
 async function addReminder(){
-  const message = document.getElementById('noticeText')?.value.trim();
-  const emoji = document.getElementById('sEmoji')?.value || '💡';
+  const message = (document.getElementById('noticeText')?.value||'').trim().slice(0, LIMITS.MESSAGE_MAX_LEN);
+  const emoji = (document.getElementById('sEmoji')?.value||'').slice(0,4) || '💡';
   if(!message){ showToast('請輸入提醒內容','gold'); return; }
   const activeCount = familyData.reminders.filter(r => r.isActive!==false).length;
-  if(activeCount>=10){ showToast('啟用中的提醒已達 10 條上限','gold'); return; }
+  if(activeCount >= LIMITS.REMINDERS_ACTIVE){ showToast(`啟用中的提醒已達 ${LIMITS.REMINDERS_ACTIVE} 條上限`,'gold'); return; }
   try {
     fsLog('writes', 'addReminder');
     await db.collection('families').doc(userFamily.id).collection('reminders').add({
