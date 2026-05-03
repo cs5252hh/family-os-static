@@ -32,6 +32,8 @@ tailwind.config={theme:{extend:{
 .card-press:active{transform:scale(.97);}
 .exp-bar{height:6px;border-radius:99px;background:#2A2D3E;overflow:hidden;}
 .exp-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#6366F1,#8B5CF6);transition:width 1s ease;}
+.report-bar{background:linear-gradient(90deg,#6366F1,#8B5CF6);}
+.exp-fill-green{height:100%;border-radius:99px;background:#10B981;transition:width 1s ease;}
 .exp-gold{height:100%;border-radius:99px;background:linear-gradient(90deg,#F59E0B,#FBBF24);transition:width 1s ease;}
 .badge{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;}
 .gold-glow{box-shadow:0 0 32px rgba(245,158,11,.15);}
@@ -65,7 +67,7 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
 [data-theme="michelin"]{--t-bg:#FAF7F2;--t-bg2:#F2EBE0;--t-bg3:#E8E0D4;--t-bg4:#D4C9BA;--t-card:#FFFFFF;--t-text:#2A2520;--t-text2:#6B5F52;--t-text3:#9A8F82;--t-border:rgba(42,37,32,.12);--t-accent:#8B6F47;--t-gold:#C99566;--t-green:#6B7F5C;--t-red:#C97D6F;}
 /* ══ Michelin Theme Overrides ══ */
 [data-theme="michelin"] body{background:#FAF7F2!important;color:#2A2520!important;}
-[data-theme="michelin"] *{font-family:'Plus Jakarta Sans','Noto Sans TC',sans-serif;}
+[data-theme="michelin"] *:not([class*="ph-"]):not([class*="ph "]){font-family:'Plus Jakarta Sans','Noto Sans TC',sans-serif;}
 [data-theme="michelin"] h1,[data-theme="michelin"] h2,[data-theme="michelin"] h3,[data-theme="michelin"] .text-2xl,[data-theme="michelin"] .text-xl,[data-theme="michelin"] .text-lg{font-family:'Fraunces','Noto Serif TC',serif!important;}
 [data-theme="michelin"] .bg-dark-900{background:#FAF7F2!important;}
 [data-theme="michelin"] .bg-dark-800{background:#FFFFFF!important;}
@@ -120,6 +122,63 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
 [data-theme="michelin"] .bg-purple-500\/10,[data-theme="michelin"] .bg-purple-500\/15{background:rgba(139,111,71,.1)!important;}
 /* Michelin toggle switch */
 [data-theme="michelin"] .peer:checked+div{background:#8B6F47!important;}
+/* ── Michelin: Category badge warm colors ── */
+[data-theme="michelin"] .text-pink-400{color:#B8866E!important;}
+[data-theme="michelin"] .text-cyan-400{color:#6B8F7A!important;}
+[data-theme="michelin"] .text-orange-400{color:#C48A54!important;}
+[data-theme="michelin"] .text-violet-400{color:#9B7FA0!important;}
+[data-theme="michelin"] .text-rose-400{color:#C08B7A!important;}
+[data-theme="michelin"] .text-amber-400{color:#B89058!important;}
+[data-theme="michelin"] .text-indigo-400{color:#8B6F47!important;}
+[data-theme="michelin"] .bg-pink-400\/10{background:rgba(184,134,110,.1)!important;}
+[data-theme="michelin"] .bg-cyan-400\/10{background:rgba(107,143,122,.1)!important;}
+[data-theme="michelin"] .bg-orange-400\/10{background:rgba(196,138,84,.1)!important;}
+[data-theme="michelin"] .bg-violet-400\/10{background:rgba(155,127,160,.1)!important;}
+[data-theme="michelin"] .bg-rose-400\/10{background:rgba(192,139,122,.1)!important;}
+[data-theme="michelin"] .bg-amber-400\/10{background:rgba(184,144,88,.1)!important;}
+/* ── Michelin: Reward icon backgrounds ── */
+[data-theme="michelin"] .bg-blue-500\/25{background:rgba(139,111,71,.15)!important;}
+[data-theme="michelin"] .bg-pink-500\/25{background:rgba(184,134,110,.15)!important;}
+[data-theme="michelin"] .bg-purple-500\/25{background:rgba(155,127,160,.12)!important;}
+[data-theme="michelin"] .bg-green-500\/25{background:rgba(107,127,92,.15)!important;}
+[data-theme="michelin"] .bg-amber-500\/25{background:rgba(201,149,102,.15)!important;}
+/* ── Michelin: Progress bars & accent-indigo ── */
+[data-theme="michelin"] .bg-accent-indigo{background:#8B6F47!important;}
+[data-theme="michelin"] .bg-accent-purple\/60{background:rgba(139,111,71,.5)!important;}
+/* ── Michelin: Bottom nav & glass ── */
+[data-theme="michelin"] #botNav.glass{background:rgba(255,255,255,.92)!important;border-top:1px solid rgba(42,37,32,.08)!important;backdrop-filter:blur(20px)!important;-webkit-backdrop-filter:blur(20px)!important;box-shadow:0 -2px 20px rgba(42,37,32,.06)!important;}
+/* ── Michelin: Modal & overlay ── */
+[data-theme="michelin"] #modalOv{background:rgba(42,37,32,.4)!important;}
+[data-theme="michelin"] #modalBox{background:#FFFFFF!important;border:1px solid rgba(42,37,32,.1)!important;}
+/* ── Michelin: Toast ── */
+[data-theme="michelin"] .toast-msg{background:#FFFFFF!important;border:1px solid rgba(42,37,32,.1)!important;color:#2A2520!important;box-shadow:0 4px 20px rgba(42,37,32,.1)!important;}
+/* ── Michelin: Red/Delete buttons ── */
+[data-theme="michelin"] .bg-red-500{background:#C97D6F!important;}
+[data-theme="michelin"] .hover\:bg-red-500\/10:hover{background:rgba(201,125,111,.1)!important;}
+[data-theme="michelin"] .hover\:bg-accent-green\/10:hover{background:rgba(107,127,92,.1)!important;}
+/* ── Michelin: Stats card subtle refinements ── */
+[data-theme="michelin"] .bg-accent-blue\/10{background:rgba(139,111,71,.08)!important;}
+[data-theme="michelin"] .bg-accent-gold\/10{background:rgba(201,149,102,.08)!important;}
+[data-theme="michelin"] .bg-accent-gold\/20{background:rgba(201,149,102,.12)!important;}
+[data-theme="michelin"] .bg-accent-blue\/5{background:rgba(139,111,71,.04)!important;}
+[data-theme="michelin"] .bg-accent-gold\/5{background:rgba(201,149,102,.04)!important;}
+/* ── Michelin: Progress bars warm gradient ── */
+[data-theme="michelin"] .report-bar{background:linear-gradient(90deg,#8B6F47,#C99566)!important;}
+[data-theme="michelin"] .exp-fill-green{background:#6B7F5C!important;}
+[data-theme="michelin"] .exp-gold{background:linear-gradient(90deg,#C99566,#E8C68F)!important;}
+/* ── Michelin: AI insight card border ── */
+[data-theme="michelin"] [style*="border-color:rgba(139,92,246"]{border-color:rgba(139,111,71,.15)!important;}
+/* ── Michelin: Avatar bg override ── */
+/* ── Michelin: Inline-styled alert/info boxes ── */
+[data-theme="michelin"] [style*="background:rgba(59,130,246"]{background:rgba(139,111,71,.08)!important;border-color:rgba(139,111,71,.2)!important;}
+[data-theme="michelin"] [style*="background:rgba(239,68,68"]{background:rgba(201,125,111,.08)!important;border-color:rgba(201,125,111,.2)!important;}
+[data-theme="michelin"] [style*="background:rgba(16,185,129"]{background:rgba(107,127,92,.08)!important;border-color:rgba(107,127,92,.2)!important;}
+[data-theme="michelin"] [style*="background:rgba(245,158,11"]{background:rgba(201,149,102,.08)!important;border-color:rgba(201,149,102,.2)!important;}
+[data-theme="michelin"] [style*="background:rgba(139,92,246"]{background:rgba(139,111,71,.06)!important;border-color:rgba(139,111,71,.12)!important;}
+[data-theme="michelin"] [style*="background:linear-gradient(135deg,rgba(245,158,11"]{background:rgba(201,149,102,.05)!important;border-color:rgba(201,149,102,.15)!important;}
+[data-theme="michelin"] [style*="background:linear-gradient(135deg,rgba(139,92,246"]{background:rgba(139,111,71,.04)!important;border-color:rgba(139,111,71,.12)!important;}
+[data-theme="michelin"] [style*="border-color:rgba(245,158,11"]{border-color:rgba(201,149,102,.2)!important;}
+[data-theme="michelin"] [style*="border-color:rgba(16,185,129"]{border-color:rgba(107,127,92,.2)!important;}
 </style>
 </head>
 <body class="bg-dark-900 text-gray-200 min-h-screen" style="font-family:'Inter','Noto Sans TC',sans-serif">
@@ -1225,7 +1284,7 @@ function kidCardForCaptain(kid){
           <span>任務進度</span>
           <span class="font-bold ${pct===100?'text-accent-green':'text-gray-400'}">${myDone}/${total}</span>
         </div>
-        <div class="exp-bar"><div style="height:100%;border-radius:99px;width:${pct}%;background:${pct===100?'#10B981':'linear-gradient(90deg,#6366F1,#8B5CF6)'};transition:width 1s ease"></div></div>
+        <div class="exp-bar"><div class="${pct===100?'exp-fill-green':'exp-fill'}" style="width:${pct}%"></div></div>
       </div>
       <div class="flex gap-1.5 shrink-0">
         ${myPend>0?`<span class="w-6 h-6 rounded-full bg-accent-gold/15 flex items-center justify-center text-[10px] font-bold text-accent-gold">${myPend}</span>`:''}
@@ -1402,7 +1461,7 @@ function monthlyReport(){
             <span class="text-gray-400 font-bold">${cnt} 次</span>
           </div>
           <div class="w-full h-2 rounded-full bg-dark-700 overflow-hidden">
-            <div class="h-full rounded-full transition-all" style="width:${pct}%;background:linear-gradient(90deg,#6366F1,#8B5CF6)"></div>
+            <div class="h-full rounded-full transition-all report-bar" style="width:${pct}%"></div>
           </div>
         </div>`;
       }).join('')}</div>
