@@ -248,7 +248,7 @@ function renderAvatarGrid(kids){
   grid.innerHTML = kids.map((k, i) => `
     <button onclick="selectRememberedKid(${i})" class="card p-4 flex flex-col items-center gap-2 transition-all hover:translate-y-[-3px] hover:border-accent-gold/30 active:scale-95 cursor-pointer group">
       <span class="text-5xl group-hover:scale-110 transition-transform">${k.avatar||'🧒'}</span>
-      <span class="text-sm font-bold text-white">${k.name||'冒險家'}</span>
+      <span class="text-sm font-bold text-white">${esc(k.name||'冒險家')}</span>
     </button>`).join('');
 }
 
@@ -304,7 +304,7 @@ function showManageDeviceModal(){
             <div class="flex items-center gap-3">
               <span class="text-2xl">${k.avatar||'🧒'}</span>
               <div>
-                <p class="text-sm font-bold text-white">${k.name||'冒險家'}</p>
+                <p class="text-sm font-bold text-white">${esc(k.name||'冒險家')}</p>
                 <p class="text-[10px] text-gray-500 font-mono">${k.kidCode||''}</p>
               </div>
             </div>
@@ -579,6 +579,7 @@ function loginSuccess(remember){
 // ══════════════════════════════════════
 // Helpers
 // ══════════════════════════════════════
+function esc(s){ if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function showToast(msg, type){
   const bg = {blue:'bg-blue-500',green:'bg-emerald-500',gold:'bg-amber-500 text-dark-900',red:'bg-red-500'};
   const el = document.createElement('div');
