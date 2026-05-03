@@ -179,6 +179,26 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
 [data-theme="michelin"] [style*="background:linear-gradient(135deg,rgba(139,92,246"]{background:rgba(139,111,71,.04)!important;border-color:rgba(139,111,71,.12)!important;}
 [data-theme="michelin"] [style*="border-color:rgba(245,158,11"]{border-color:rgba(201,149,102,.2)!important;}
 [data-theme="michelin"] [style*="border-color:rgba(16,185,129"]{border-color:rgba(107,127,92,.2)!important;}
+/* ============= Wave 1: UI 微調 ============= */
+/* 修法 1：確保 Phosphor icon 在米其林模式可見 */
+[data-theme="michelin"] i[class*="ph"]{color:inherit!important;display:inline-block!important;}
+/* 修法 2：CTA 按鈕從橘色 → 深棕黑（米其林主色） */
+[data-theme="michelin"] .bg-accent-gold{background:#2A2520!important;color:#FAF7F2!important;}
+[data-theme="michelin"] .bg-accent-gold:hover{background:#8B6F47!important;}
+[data-theme="michelin"] .text-dark-900{color:#FAF7F2!important;}
+/* 修法 3：accent-blue (KID 代碼等) → 暖棕色 */
+[data-theme="michelin"] .text-accent-blue\/80{color:#8B6F47!important;}
+[data-theme="michelin"] .bg-accent-blue\/5{background:rgba(139,111,71,.06)!important;}
+[data-theme="michelin"] .border-accent-blue\/20{border-color:rgba(139,111,71,.2)!important;}
+[data-theme="michelin"] .border-accent-blue\/40{border-color:rgba(139,111,71,.4)!important;}
+/* 修法 4：+數字 🐚 對比加強（顏色加深 + 字重加粗） */
+[data-theme="michelin"] .text-accent-gold{color:#B8854A!important;font-weight:600!important;}
+/* 修法 5：大數字（貝殼幣等）改用襯線字 */
+[data-theme="michelin"] .text-5xl,[data-theme="michelin"] .text-4xl,[data-theme="michelin"] .text-3xl{font-family:'Fraunces','Noto Serif TC',serif!important;font-weight:500!important;font-variation-settings:"opsz" 144!important;}
+/* 修法 7：Tab 從實心塊 → 底線 pill */
+[data-theme="michelin"] .tab-bar{background:transparent!important;border:none!important;border-bottom:1px solid rgba(42,37,32,.12)!important;border-radius:0!important;padding:0!important;gap:8px!important;}
+[data-theme="michelin"] .tab-btn{border-radius:0!important;border-bottom:2px solid transparent!important;padding:12px 16px!important;background:transparent!important;color:#6B5F52!important;}
+[data-theme="michelin"] .tab-btn.active{background:transparent!important;color:#2A2520!important;border-bottom-color:#8B6F47!important;box-shadow:none!important;font-weight:600!important;}
 </style>
 </head>
 <body class="bg-dark-900 text-gray-200 min-h-screen" style="font-family:'Inter','Noto Sans TC',sans-serif">
@@ -1210,7 +1230,7 @@ function renderPage(){
   if(!el) return;
 
   if(userRole === 'captain'){
-    const titles = {home:'首頁總覽 ⚓', tasks:'任務管理 📋', rewards:'獎勵中心 🎁', reminders:'貼心提醒 🔔', kids:'冒險家管理 👥', account:'帳號管理 ⚙️'};
+    const titles = {home:'首頁總覽', tasks:'任務管理', rewards:'獎勵中心', reminders:'貼心提醒', kids:'冒險家管理', account:'帳號管理'};
     const subs = {home:'船長總覽', tasks:'管理全家任務', rewards:'審核與管理獎勵', reminders:'設定貼心提醒', kids:'管理家中的小冒險家', account:'個人資料與家庭設定'};
     ht.textContent = titles[currentPage] || 'AdventureKids 冒險島';
     hr.innerHTML = '';
@@ -1223,7 +1243,7 @@ function renderPage(){
                  : currentPage==='kids' ? captainKids()
                  : currentPage==='account' ? captainAccount() : '';
   } else {
-    const titles = {home:`嗨，${currentUser?.name||'冒險家'} 🚀`, tasks:'我的任務 ✅', store:'貝殼幣商城 🐚', history:'歷程紀錄 📖'};
+    const titles = {home:`嗨，${currentUser?.name||'冒險家'}`, tasks:'我的任務', store:'貝殼幣商城', history:'歷程紀錄'};
     const subs = {home:'今天要完成什麼呢？', tasks:'加油完成任務吧！', store:'看看有什麼好東西', history:'你的冒險成績單'};
     ht.textContent = titles[currentPage] || '冒險島';
     if(hSub){ hSub.textContent = subs[currentPage]||''; hSub.classList.toggle('hidden', !subs[currentPage]); }
