@@ -32,7 +32,7 @@ body{font-family:'Inter','Noto Sans TC',sans-serif;background:#13141C;color:#e5e
 /* ══ Michelin Theme ══ */
 [data-theme="michelin"] body{background:#FAF7F2!important;color:#2A2520!important;}
 [data-theme="michelin"] body,[data-theme="michelin"] input,[data-theme="michelin"] select,[data-theme="michelin"] textarea,[data-theme="michelin"] button{font-family:'Plus Jakarta Sans','Noto Sans TC',sans-serif;}
-[data-theme="michelin"] h1,[data-theme="michelin"] h2,[data-theme="michelin"] .text-2xl,[data-theme="michelin"] .text-xl,[data-theme="michelin"] .text-lg{font-family:'Fraunces','Noto Serif TC',serif!important;}
+[data-theme="michelin"] h1,[data-theme="michelin"] h2,[data-theme="michelin"] .text-2xl:not([class*="ph"]),[data-theme="michelin"] .text-xl:not([class*="ph"]),[data-theme="michelin"] .text-lg:not([class*="ph"]){font-family:'Fraunces','Noto Serif TC',serif!important;}
 [data-theme="michelin"] .bg-dark-900{background:#FAF7F2!important;}
 [data-theme="michelin"] .bg-dark-800{background:#FFFFFF!important;}
 [data-theme="michelin"] .bg-dark-700{background:#F2EBE0!important;}
@@ -56,6 +56,10 @@ body{font-family:'Inter','Noto Sans TC',sans-serif;background:#13141C;color:#e5e
 [data-theme="michelin"] .text-dark-900{color:#2A2520!important;}
 [data-theme="michelin"] a{color:#8B6F47!important;}
 [data-theme="michelin"] .loading-spinner{border-color:#E8E0D4!important;border-top-color:#8B6F47!important;}
+/* Phosphor icon font 不被 .text-lg/.text-2xl 等覆蓋 */
+[data-theme="michelin"] i[class*="ph-fill"]{font-family:"Phosphor-Fill"!important;}
+[data-theme="michelin"] i[class*="ph-bold"]{font-family:"Phosphor-Bold"!important;}
+[data-theme="michelin"] i.ph{font-family:"Phosphor"!important;}
 </style>
 <script>(function(){var t=localStorage.getItem('app_theme');if(t==='michelin')document.documentElement.setAttribute('data-theme','michelin');})()</script>
 </head>
