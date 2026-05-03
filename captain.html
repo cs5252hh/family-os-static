@@ -279,7 +279,7 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
       <nav id="sideNav" class="space-y-1"></nav>
     </div>
     <div id="sideLogout" onclick="vibrate([5,30,5]);showLogoutConfirm()" class="p-3 card cursor-pointer hover:border-accent-red transition-all flex items-center gap-3 group card-press">
-      <i class="ph ph-sign-out text-gray-500 group-hover:text-red-400 text-lg"></i>
+      <i id="sideLogoutIcon" class="ph ph-sign-out text-gray-500 group-hover:text-red-400 text-lg"></i>
       <span id="sideLogoutText" class="text-sm text-gray-500 group-hover:text-red-400">登出</span>
     </div>
   </aside>
@@ -1069,9 +1069,11 @@ function buildNav(){
     }
   }
 
-  // Logout text
+  // Logout text & icon
   const logTxt = document.getElementById('sideLogoutText');
-  if(logTxt) logTxt.textContent = isCap ? '👨‍✈️ 登出船長後台' : '🧒 登出冒險家';
+  if(logTxt) logTxt.textContent = isCap ? '👨‍✈️ 登出船長後台' : '🧒 切換冒險家';
+  const logIcon = document.getElementById('sideLogoutIcon');
+  if(logIcon) logIcon.className = isCap ? 'ph ph-sign-out text-gray-500 group-hover:text-red-400 text-lg' : 'ph ph-swap text-gray-500 group-hover:text-accent-gold text-lg';
 
   document.getElementById('sideNav').innerHTML = ns.map(n => `
     <button onclick="vibrate(5);switchPage('${n.id}')" id="side-${n.id}"
@@ -3762,8 +3764,8 @@ function captainAccount(){
     <!-- Section D: Account Operations -->
     <div class="card p-5">
       <p class="text-[11px] text-gray-500 font-bold uppercase tracking-widest mb-4"><i class="ph-fill ph-gear-six mr-1"></i>帳號操作</p>
-      <button onclick="vibrate([5,30,5]);showLogoutConfirm()" class="w-full py-3 rounded-xl bg-dark-700 hover:bg-dark-600 border border-dark-600 text-red-400 text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2">
-        <i class="ph ph-sign-out"></i> 登出船長後台
+      <button onclick="vibrate([5,30,5]);showLogoutConfirm()" class="w-full py-3 rounded-xl bg-dark-700 hover:bg-dark-600 border border-dark-600 ${uid.startsWith('kid_')?'text-accent-gold':'text-red-400'} text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+        <i class="ph ${uid.startsWith('kid_')?'ph-swap':'ph-sign-out'}"></i> ${uid.startsWith('kid_')?'切換冒險家':'登出船長後台'}
       </button>
     </div>
   </div>`;
@@ -3855,13 +3857,13 @@ function showLogoutConfirm(){
   showModal(`
     <div class="text-center">
       <div class="w-14 h-14 rounded-2xl ${isCap?'bg-accent-blue/10':'bg-accent-gold/10'} flex items-center justify-center mx-auto mb-3">
-        <span class="text-3xl">${isCap?'👨‍✈️':'🧒'}</span>
+        <span class="text-3xl">${isCap?'👨‍✈️':'🔄'}</span>
       </div>
-      <h3 class="text-lg font-bold mb-2">確定要${isCap?'登出':'離開冒險'}嗎？</h3>
-      <p class="text-sm text-gray-400 mb-6">${isCap?'離開船長後台後，其他裝置仍可繼續使用。':'記得完成今天的任務再走喔！'}</p>
+      <h3 class="text-lg font-bold mb-2">${isCap?'確定要登出嗎？':'要切換冒險家嗎？'}</h3>
+      <p class="text-sm text-gray-400 mb-6">${isCap?'離開船長後台後，其他裝置仍可繼續使用。':'回到選擇頁面，換個冒險家登入吧！'}</p>
       <div class="flex gap-2">
         <button onclick="closeModal()" class="flex-1 card py-3 text-sm font-bold text-gray-400 hover:text-white transition-all">取消</button>
-        <button onclick="closeModal();logout()" class="flex-1 bg-red-500 text-white py-3 rounded-xl text-sm font-bold transition-all active:scale-95 hover:brightness-110">${isCap?'👨‍✈️ 登出':'🧒 離開'}</button>
+        <button onclick="closeModal();logout()" class="flex-1 ${isCap?'bg-red-500':'bg-accent-gold'} text-white py-3 rounded-xl text-sm font-bold transition-all active:scale-95 hover:brightness-110">${isCap?'👨‍✈️ 登出':'🔄 切換冒險家'}</button>
       </div>
     </div>`, '380px');
 }
@@ -3882,9 +3884,7 @@ function logout(){
     window.location.href = 'kid.html';
     return;
   }
-  document.getElementById('mainApp').classList.add('hidden');
-  document.getElementById('loadingScreen').classList.remove('hidden');
-  showLoginScreen();
+  window.location.href = 'index.html';
 }
 
 // ══════════════════════════════════════
