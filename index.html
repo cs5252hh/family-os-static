@@ -73,41 +73,24 @@ body{background:#13141C;color:#fff;margin:0;min-height:100dvh;}
 
 </div>
 
-<div id="debugPanel" style="position:fixed;bottom:0;left:0;right:0;background:#000;color:#0f0;font-size:11px;padding:8px 12px;max-height:40vh;overflow-y:auto;z-index:99999;font-family:monospace;white-space:pre-wrap;"></div>
 <script>
-const _d = document.getElementById('debugPanel');
-function dbg(msg){ _d.textContent += msg + '\n'; console.log('[DBG]', msg); }
-
+// LIFF 登入完會跳回這裡（LIFF endpoint），偵測是否需要轉回 captain.html
 (async function(){
-  dbg('1. script start');
-  dbg('2. URL: ' + location.href);
-  dbg('3. localStorage.liffLoginReturn: ' + localStorage.getItem('liffLoginReturn'));
   try {
-    dbg('4. calling liff.init()...');
     await liff.init({ liffId: '2009808286-3qfR7gLt' });
-    dbg('5. liff.init() OK');
-    dbg('6. isLoggedIn: ' + liff.isLoggedIn());
-    dbg('7. isInClient: ' + liff.isInClient());
     if(liff.isLoggedIn()){
       const returnTo = localStorage.getItem('liffLoginReturn');
       localStorage.removeItem('liffLoginReturn');
-      dbg('8. returnTo flag: ' + returnTo);
       if(returnTo){
-        const dest = returnTo === 'captain' ? 'captain.html' : returnTo + '.html';
-        dbg('9. REDIRECTING to: ' + dest);
-        window.location.href = dest;
+        window.location.href = returnTo === 'captain' ? 'captain.html' : returnTo + '.html';
       } else if(liff.isInClient()){
-        dbg('9. REDIRECTING to captain.html (inClient fallback)');
         window.location.href = 'captain.html';
-      } else {
-        dbg('9. NO REDIRECT (not inClient, no flag)');
       }
     } else {
-      dbg('8. NOT logged in — clearing flag');
       localStorage.removeItem('liffLoginReturn');
     }
   } catch(e){
-    dbg('ERR: ' + e.message);
+    console.warn('LIFF init on index:', e);
     localStorage.removeItem('liffLoginReturn');
   }
 })();
