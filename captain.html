@@ -9,7 +9,6 @@
 <script src="https://unpkg.com/@phosphor-icons/web"></script>
 <script src="https://static.line-scdn.net/liff/edge/2.1/liff.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
 tailwind.config={theme:{extend:{
@@ -664,29 +663,6 @@ function updateLoadingText(text){
 let liffInited = false;
 
 async function initLiff(){
-  // Step 0: 接住 Google signInWithRedirect 回來的結果
-  try {
-    const redirectResult = await firebase.auth().getRedirectResult();
-    if(redirectResult && redirectResult.user){
-      liffUserId = 'google_' + redirectResult.user.uid;
-      // 恢復 loading 畫面
-      document.getElementById('loadingScreen').innerHTML = `
-        <div class="text-center">
-          <div class="loading-spinner mx-auto mb-4"></div>
-          <p class="text-lg font-medium">🌊 AdventureKids 啟動中...</p>
-          <p id="loadingText" class="text-sm text-gray-400 mt-2">Google 登入成功，載入資料中...</p>
-        </div>`;
-      await checkUserSetup();
-      return;
-    }
-  } catch(e){
-    console.error('Google redirect 登入失敗:', e);
-    if(e.code === 'auth/unauthorized-domain'){
-      alert('此網域尚未加入 Firebase Auth 授權清單。\n請到 Firebase Console → Authentication → Settings → Authorized domains 新增此網域。');
-    }
-    // 繼續正常流程，顯示登入畫面
-  }
-
   // Step 1: 檢查 kid mode
   const params = new URLSearchParams(window.location.search);
   if(params.get('mode') === 'kid'){
@@ -732,14 +708,10 @@ function showLoginScreen(){
     <div class="text-center px-6">
       <img src="island-logo.png" alt="AdventureKids" style="width:80px;height:80px;" class="mb-4 mx-auto">
       <h1 class="text-2xl font-bold mb-2">AdventureKids 冒險島</h1>
-      <p class="text-gray-400 mb-8">選擇登入方式</p>
-      <div class="max-w-sm mx-auto space-y-3 mb-6">
-        <button onclick="loginWithLine()" class="w-full bg-green-600 hover:bg-green-700 rounded-lg py-3 px-4 transition-colors flex items-center justify-center space-x-2">
+      <p class="text-gray-400 mb-8">使用 LINE 帳號登入</p>
+      <div class="max-w-sm mx-auto mb-6">
+        <button onclick="loginWithLine()" class="w-full bg-green-600 hover:bg-green-700 rounded-lg py-3.5 px-4 transition-colors flex items-center justify-center space-x-2 text-white font-medium">
           <span class="text-lg">💬 LINE 登入</span>
-        </button>
-        <button onclick="loginWithGoogle()" class="w-full bg-white hover:bg-gray-100 text-gray-800 rounded-lg py-3 px-4 transition-colors flex items-center justify-center space-x-3 border border-gray-300">
-          <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#4285F4" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#34A853" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 000 24c0 3.77.9 7.35 2.56 10.53l7.97-5.94z"/><path fill="#EA4335" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.94C6.51 42.62 14.62 48 24 48z"/></svg>
-          <span class="font-medium">使用 Google 帳號登入</span>
         </button>
       </div>
       <div class="border-t border-dark-700 pt-4 space-y-2">
@@ -752,27 +724,6 @@ function showLoginScreen(){
 function loginWithLine(){
   if(liffInited){ localStorage.setItem('liffLoginReturn',JSON.stringify({to:'captain',ts:Date.now()})); liff.login(); }
   else alert('LINE SDK 尚未準備好，請重新整理頁面');
-}
-
-function loginWithGoogle(){
-  console.log('[DEBUG] loginWithGoogle called, liffInited=' + liffInited);
-  const provider = new firebase.auth.GoogleAuthProvider();
-  // LINE 內建瀏覽器不支援 popup，改用 redirect；桌面瀏覽器用 popup 更順暢
-  if(liffInited && liff.isInClient()){
-    firebase.auth().signInWithRedirect(provider);
-  } else {
-    firebase.auth().signInWithPopup(provider).then(function(result){
-      if(result && result.user){
-        liffUserId = 'google_' + result.user.uid;
-        document.getElementById('loadingScreen').innerHTML = '<div class="text-center"><div class="loading-spinner mx-auto mb-4"></div><p class="text-lg font-medium">🌊 AdventureKids 啟動中...</p><p id="loadingText" class="text-sm text-gray-400 mt-2">Google 登入成功，載入資料中...</p></div>';
-        checkUserSetup();
-      }
-    }).catch(function(e){
-      console.error('Google 登入失敗:', e);
-      if(e.code === 'auth/popup-closed-by-user') return;
-      alert('Google 登入失敗：' + (e.message || e.code || '未知錯誤'));
-    });
-  }
 }
 
 async function checkUserSetup(){
@@ -3702,24 +3653,13 @@ function captainAccount(){
   const familyName = userFamily?.name || '冒險島';
   const memberCount = userFamily?.members?.length || 0;
 
-  // Login method detection (based on currentUser.userId or liffUserId)
+  // Login method detection
   const uid = currentUser?.userId || liffUserId || '';
-  let loginMethod = '未知';
-  let loginIcon = '<i class="ph ph-question text-gray-400"></i>';
-  let loginDetailLabel = '';
-  let loginDetailValue = '';
-  if(uid.startsWith('google_')){
-    loginMethod = 'Google 登入';
-    loginIcon = '<i class="ph-bold ph-google-logo text-red-400"></i>';
-    const authUser = firebase.auth().currentUser;
-    if(authUser?.email){ loginDetailLabel = '帳號'; loginDetailValue = authUser.email; }
-    else if(authUser?.displayName){ loginDetailLabel = '名稱'; loginDetailValue = authUser.displayName; }
-  } else if(uid.startsWith('kid_')){
+  let loginMethod = 'LINE 登入';
+  let loginIcon = '<i class="ph-bold ph-chat-circle-dots text-green-400"></i>';
+  if(uid.startsWith('kid_')){
     loginMethod = '小冒險家';
     loginIcon = '🧒';
-  } else if(uid && !uid.startsWith('google_')){
-    loginMethod = 'LINE 登入';
-    loginIcon = '<i class="ph-bold ph-chat-circle-dots text-green-400"></i>';
   }
 
   const emojiOptions = ['👨‍✈️','👩‍✈️','🧑‍✈️','🦸','🦸‍♀️','🧙','🧙‍♀️','🦊','🐻','🐯','🦁','🐼'];
@@ -3773,11 +3713,6 @@ function captainAccount(){
         <p class="text-[11px] text-gray-500 mb-0.5">登入方式</p>
         <p class="text-sm text-white flex items-center gap-1.5">${loginIcon} ${loginMethod}</p>
       </div>
-      ${loginDetailValue ? `
-      <div class="py-3 border-t border-dark-600">
-        <p class="text-[11px] text-gray-500 mb-0.5">${loginDetailLabel}</p>
-        <p class="text-sm text-gray-400">${loginDetailValue}</p>
-      </div>` : ''}
     </div>
 
     <!-- Section B: Family Info -->
