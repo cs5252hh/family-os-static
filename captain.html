@@ -102,12 +102,14 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
 [data-theme="michelin"] .text-green-400{color:#5B8F6A!important;}
 [data-theme="michelin"] .text-blue-400{color:#C2604A!important;}
 [data-theme="michelin"] .text-amber-300{color:#D4A84B!important;}
-/* ── Accent backgrounds ── */
-[data-theme="michelin"] .bg-accent-blue{background:#C2604A!important;}
-[data-theme="michelin"] .bg-green-600{background:#5B8F6A!important;}
-[data-theme="michelin"] .bg-green-700{background:#4A7A58!important;}
-[data-theme="michelin"] .bg-blue-500{background:#C2604A!important;}
-[data-theme="michelin"] .bg-blue-600{background:#A84F3D!important;}
+/* ── Accent backgrounds (含白色文字) ── */
+[data-theme="michelin"] .bg-accent-blue{background:#C2604A!important;color:#FFFFFF!important;}
+[data-theme="michelin"] .bg-green-600{background:#5B8F6A!important;color:#FFFFFF!important;}
+[data-theme="michelin"] .bg-green-700{background:#4A7A58!important;color:#FFFFFF!important;}
+[data-theme="michelin"] .bg-blue-500{background:#C2604A!important;color:#FFFFFF!important;}
+[data-theme="michelin"] .bg-blue-600{background:#A84F3D!important;color:#FFFFFF!important;}
+/* ── 確保彩色背景上的 .text-white 保持白色 ── */
+[data-theme="michelin"] [class*="bg-accent-blue"] .text-white,[data-theme="michelin"] [class*="bg-accent-gold"] .text-white,[data-theme="michelin"] [class*="bg-green-6"] .text-white,[data-theme="michelin"] [class*="bg-red-5"] .text-white,[data-theme="michelin"] [class*="bg-blue-5"] .text-white,[data-theme="michelin"] [class*="bg-blue-6"] .text-white{color:#FFFFFF!important;}
 /* ── Tab bar: underline ── */
 [data-theme="michelin"] .tab-bar{background:transparent!important;border:none!important;border-bottom:1.5px solid rgba(45,41,38,.1)!important;border-radius:0!important;padding:0!important;gap:4px!important;}
 [data-theme="michelin"] .tab-btn{border-radius:0!important;border-bottom:2.5px solid transparent!important;padding:12px 16px!important;background:transparent!important;color:#9E9792!important;transition:all .2s ease!important;}
@@ -134,6 +136,11 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
 /* ── Hover states ── */
 [data-theme="michelin"] .hover\:bg-dark-700:hover{background:#F3EDE4!important;}
 [data-theme="michelin"] .hover\:bg-dark-600:hover{background:#E8E0D4!important;}
+/* ── 半透明深色色塊 → 暖色調 ── */
+[data-theme="michelin"] .bg-dark-700\/50{background:rgba(232,224,212,.6)!important;}
+[data-theme="michelin"] .bg-dark-700\/40{background:rgba(232,224,212,.5)!important;}
+[data-theme="michelin"] .bg-dark-800\/50{background:rgba(255,255,255,.6)!important;}
+[data-theme="michelin"] .bg-dark-800\/80{background:rgba(255,255,255,.8)!important;}
 /* ── Tinted backgrounds ── */
 [data-theme="michelin"] .bg-green-500\/10,[data-theme="michelin"] .bg-green-600\/10{background:rgba(91,143,106,.08)!important;}
 [data-theme="michelin"] .bg-blue-500\/10,[data-theme="michelin"] .bg-blue-600\/10{background:rgba(194,96,74,.07)!important;}
@@ -162,8 +169,10 @@ textarea:focus,input:focus,select:focus{border-color:#3B82F6!important;outline:n
 [data-theme="michelin"] .bg-purple-500\/25{background:rgba(142,115,150,.1)!important;}
 [data-theme="michelin"] .bg-green-500\/25{background:rgba(91,143,106,.1)!important;}
 [data-theme="michelin"] .bg-amber-500\/25{background:rgba(212,168,75,.1)!important;}
-/* ── Accent indigo ── */
+/* ── Accent indigo & purple ── */
 [data-theme="michelin"] .bg-accent-indigo{background:#6B7DB5!important;}
+[data-theme="michelin"] .bg-accent-purple\/10{background:rgba(194,96,74,.06)!important;}
+[data-theme="michelin"] .bg-accent-purple\/20{background:rgba(194,96,74,.1)!important;}
 [data-theme="michelin"] .bg-accent-purple\/60{background:rgba(142,115,150,.5)!important;}
 /* ── Bottom nav ── */
 [data-theme="michelin"] #botNav.glass{background:rgba(255,255,255,.92)!important;border-top:1px solid rgba(45,41,38,.06)!important;backdrop-filter:blur(24px)!important;-webkit-backdrop-filter:blur(24px)!important;box-shadow:0 -1px 12px rgba(45,41,38,.04)!important;}
