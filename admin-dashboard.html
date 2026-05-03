@@ -105,6 +105,12 @@ body{background:var(--t-bg)!important;color:var(--t-text)!important;transition:b
 </head>
 <body class="min-h-screen">
 
+<!-- ═══ Floating Theme Toggle ═══ -->
+<button onclick="toggleTheme()" class="theme-toggle" id="floatingThemeBtn" title="切換主題"
+  style="position:fixed;top:12px;right:12px;z-index:9999;background:var(--t-card);border:1px solid var(--t-border);box-shadow:var(--t-stat-shadow);border-radius:999px;width:40px;height:40px;">
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" id="floatingThemeIcon"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z"/></svg>
+</button>
+
 <!-- ═══ Login Screen ═══ -->
 <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4">
   <div class="card p-8 w-full max-w-sm text-center fade">
@@ -745,10 +751,12 @@ function toggleTheme(){
 }
 
 function updateThemeIcon(){
-  const icon = document.getElementById('themeIcon');
-  if(!icon) return;
   const isMichelin = document.documentElement.getAttribute('data-theme') === 'michelin';
-  icon.innerHTML = isMichelin ? MOON_SVG : SUN_SVG;
+  const svg = isMichelin ? MOON_SVG : SUN_SVG;
+  ['themeIcon','floatingThemeIcon'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = svg;
+  });
 }
 
 initTheme();
