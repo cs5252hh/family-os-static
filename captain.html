@@ -1487,13 +1487,10 @@ function monthlyReport(){
       </button>
     </div>
 
-    <!-- 📤 Share/Export -->
-    <div class="grid grid-cols-2 gap-3">
-      <button onclick="vibrate(5);shareReportToLINE()" class="card p-3 flex items-center justify-center gap-2 text-accent-green font-bold text-xs transition-all hover:border-accent-green/40 active:scale-95">
+    <!-- 📤 Share -->
+    <div>
+      <button onclick="vibrate(5);shareReportToLINE()" class="card p-3 w-full flex items-center justify-center gap-2 text-accent-green font-bold text-xs transition-all hover:border-accent-green/40 active:scale-95">
         <i class="ph ph-share-network text-lg"></i> 分享到 LINE
-      </button>
-      <button onclick="vibrate(5);copyReportSummary()" class="card p-3 flex items-center justify-center gap-2 text-accent-blue font-bold text-xs transition-all hover:border-accent-blue/40 active:scale-95">
-        <i class="ph ph-copy text-lg"></i> 複製報告摘要
       </button>
     </div>
   </div>`;
@@ -1533,27 +1530,6 @@ function shareReportToLINE(){
   } else {
     window.open('https://line.me/R/share?text=' + encoded, '_blank');
   }
-}
-
-function copyReportSummary(){
-  const text = buildReportText();
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).then(function(){
-      showToast('📋 報告摘要已複製！','green');
-    }).catch(function(){
-      fallbackCopy(text);
-    });
-  } else {
-    fallbackCopy(text);
-  }
-}
-function fallbackCopy(text){
-  const ta = document.createElement('textarea');
-  ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
-  document.body.appendChild(ta); ta.select();
-  try { document.execCommand('copy'); showToast('📋 報告摘要已複製！','green'); }
-  catch(e){ showToast('複製失敗，請手動複製','red'); }
-  document.body.removeChild(ta);
 }
 
 function captainHome(){
