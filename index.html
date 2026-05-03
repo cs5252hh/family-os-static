@@ -73,26 +73,41 @@ body{background:#13141C;color:#fff;margin:0;min-height:100dvh;}
 
 </div>
 
+<div id="debugPanel" style="position:fixed;bottom:0;left:0;right:0;background:#000;color:#0f0;font-size:11px;padding:8px 12px;max-height:40vh;overflow-y:auto;z-index:99999;font-family:monospace;white-space:pre-wrap;"></div>
 <script>
-// LIFF 登入完會跳回這裡（LIFF endpoint），偵測是否需要轉回 captain.html
-// 永遠 init LIFF，確保 auth code 被處理（不管 flag 有沒有存活）
+const _d = document.getElementById('debugPanel');
+function dbg(msg){ _d.textContent += msg + '\n'; console.log('[DBG]', msg); }
+
 (async function(){
+  dbg('1. script start');
+  dbg('2. URL: ' + location.href);
+  dbg('3. localStorage.liffLoginReturn: ' + localStorage.getItem('liffLoginReturn'));
   try {
+    dbg('4. calling liff.init()...');
     await liff.init({ liffId: '2009808286-3qfR7gLt' });
+    dbg('5. liff.init() OK');
+    dbg('6. isLoggedIn: ' + liff.isLoggedIn());
+    dbg('7. isInClient: ' + liff.isInClient());
     if(liff.isLoggedIn()){
-      // 有 flag → 依 flag 跳轉；沒 flag 但在 LINE 內 → 預設跳 captain（小冒險家不走 LIFF）
       const returnTo = localStorage.getItem('liffLoginReturn');
       localStorage.removeItem('liffLoginReturn');
+      dbg('8. returnTo flag: ' + returnTo);
       if(returnTo){
-        window.location.href = returnTo === 'captain' ? 'captain.html' : returnTo + '.html';
+        const dest = returnTo === 'captain' ? 'captain.html' : returnTo + '.html';
+        dbg('9. REDIRECTING to: ' + dest);
+        window.location.href = dest;
       } else if(liff.isInClient()){
+        dbg('9. REDIRECTING to captain.html (inClient fallback)');
         window.location.href = 'captain.html';
+      } else {
+        dbg('9. NO REDIRECT (not inClient, no flag)');
       }
     } else {
+      dbg('8. NOT logged in — clearing flag');
       localStorage.removeItem('liffLoginReturn');
     }
   } catch(e){
-    console.warn('LIFF init on index:', e);
+    dbg('ERR: ' + e.message);
     localStorage.removeItem('liffLoginReturn');
   }
 })();
