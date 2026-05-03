@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AdventureKids 管理員儀表板</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;600;700&family=Fraunces:opsz,wght,SOFT@9..144,400,0;9..144,500,0;9..144,600,0;9..144,500,100;9..144,400,100&family=Noto+Serif+TC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/@phosphor-icons/web"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -20,36 +20,98 @@ tailwind.config={theme:{extend:{
 }}}
 </script>
 <style>
-*{font-family:'Inter','Noto Sans TC',sans-serif;-webkit-tap-highlight-color:transparent;}
+/* ══ Default: Dark Theme ══ */
+:root{
+  --t-bg:#13141C;--t-bg2:#1C1E2A;--t-bg3:#2A2D3E;--t-bg4:#3F445E;
+  --t-card:#1C1E2A;--t-text:#ffffff;--t-text2:#9CA3AF;--t-text3:#6B7280;
+  --t-border:#2A2D3E;--t-border2:rgba(42,45,62,.5);
+  --t-accent:#3B82F6;--t-accent-hover:rgba(59,130,246,.15);--t-accent-text:#60A5FA;
+  --t-gold:#F59E0B;--t-green:#10B981;--t-red:#EF4444;--t-purple:#8B5CF6;--t-indigo:#6366F1;
+  --t-stat-bg:linear-gradient(135deg,#1C1E2A 0%,#2A2D3E 100%);
+  --t-stat-shadow:0 8px 24px rgba(0,0,0,.3);
+  --t-header-bg:rgba(19,20,28,.9);
+  --t-row-hover:rgba(42,45,62,.5);
+  --t-font:'Inter','Noto Sans TC',sans-serif;
+  --t-font-display:'Inter','Noto Sans TC',sans-serif;
+  --t-badge-admin-bg:rgba(139,92,246,.15);--t-badge-admin-text:#A78BFA;
+  --t-badge-blue-bg:rgba(59,130,246,.2);--t-badge-blue-text:#60A5FA;
+  --t-badge-green-bg:rgba(16,185,129,.2);--t-badge-green-text:#34D399;
+  --t-badge-red-bg:rgba(239,68,68,.2);--t-badge-red-text:#F87171;
+  --t-badge-purple-bg:rgba(139,92,246,.2);--t-badge-purple-text:#A78BFA;
+  --t-badge-mute-bg:#3F445E;--t-badge-mute-text:#9CA3AF;
+  --t-login-btn-bg:#ffffff;--t-login-btn-text:#1f2937;--t-login-btn-border:#d1d5db;
+  --t-select-bg:#2A2D3E;--t-select-border:#3F445E;--t-select-text:#D1D5DB;
+}
+/* ══ Michelin Warm Theme ══ */
+[data-theme="michelin"]{
+  --t-bg:#FAF7F2;--t-bg2:#F2EBE0;--t-bg3:#E8E0D4;--t-bg4:#D4C9BA;
+  --t-card:#FFFFFF;--t-text:#2A2520;--t-text2:#6B5F52;--t-text3:#9A8F82;
+  --t-border:rgba(42,37,32,.10);--t-border2:rgba(42,37,32,.06);
+  --t-accent:#8B6F47;--t-accent-hover:rgba(139,111,71,.1);--t-accent-text:#6B5F52;
+  --t-gold:#C99566;--t-green:#6B7F5C;--t-red:#C97D6F;--t-purple:#8B6F47;--t-indigo:#6B5F52;
+  --t-stat-bg:#FFFFFF;
+  --t-stat-shadow:0 20px 40px -20px rgba(139,111,71,.15);
+  --t-header-bg:rgba(250,247,242,.92);
+  --t-row-hover:rgba(242,235,224,.6);
+  --t-font:'Plus Jakarta Sans','Noto Sans TC',sans-serif;
+  --t-font-display:'Fraunces','Noto Serif TC',serif;
+  --t-badge-admin-bg:rgba(139,111,71,.12);--t-badge-admin-text:#8B6F47;
+  --t-badge-blue-bg:rgba(139,111,71,.1);--t-badge-blue-text:#6B5F52;
+  --t-badge-green-bg:rgba(107,127,92,.12);--t-badge-green-text:#6B7F5C;
+  --t-badge-red-bg:rgba(201,125,111,.12);--t-badge-red-text:#C97D6F;
+  --t-badge-purple-bg:rgba(139,111,71,.1);--t-badge-purple-text:#8B6F47;
+  --t-badge-mute-bg:rgba(42,37,32,.06);--t-badge-mute-text:#9A8F82;
+  --t-login-btn-bg:#FFFFFF;--t-login-btn-text:#2A2520;--t-login-btn-border:rgba(42,37,32,.15);
+  --t-select-bg:#FFFFFF;--t-select-border:rgba(42,37,32,.15);--t-select-text:#2A2520;
+}
+*{font-family:var(--t-font);-webkit-tap-highlight-color:transparent;}
+body{background:var(--t-bg)!important;color:var(--t-text)!important;transition:background .3s,color .3s;}
 ::-webkit-scrollbar{width:3px;}
-::-webkit-scrollbar-thumb{background:#2A2D3E;border-radius:10px;}
-.fade{animation:fadeIn .3s ease forwards;}
-@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.card{background:#1C1E2A;border:1px solid #2A2D3E;border-radius:16px;}
-.stat-card{background:linear-gradient(135deg,#1C1E2A 0%,#2A2D3E 100%);border:1px solid #2A2D3E;border-radius:16px;transition:transform .2s,box-shadow .2s;}
-.stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);}
+::-webkit-scrollbar-thumb{background:var(--t-bg3);border-radius:10px;}
+.fade{animation:fadeUp .6s cubic-bezier(.2,.8,.2,1) both;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.card{background:var(--t-card);border:1px solid var(--t-border);border-radius:16px;transition:background .3s,border-color .3s;}
+.stat-card{background:var(--t-stat-bg);border:1px solid var(--t-border);border-radius:16px;transition:transform .2s cubic-bezier(.2,.8,.2,1),box-shadow .2s,background .3s;}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--t-stat-shadow);}
 .table-row{transition:background .15s;}
-.table-row:hover{background:rgba(42,45,62,.5);}
+.table-row:hover{background:var(--t-row-hover);}
 .badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:9999px;font-size:12px;font-weight:500;}
-.expand-content{max-height:0;overflow:hidden;transition:max-height .3s ease;}
+.expand-content{max-height:0;overflow:hidden;transition:max-height .3s cubic-bezier(.2,.8,.2,1);}
 .expand-content.open{max-height:500px;}
-.tab-btn{padding:8px 20px;border-radius:9999px;font-size:14px;font-weight:500;transition:all .2s;}
-.tab-btn.active{background:#3B82F6;color:#fff;}
-.tab-btn:not(.active){color:#9CA3AF;}
-.tab-btn:not(.active):hover{background:rgba(59,130,246,.15);color:#60A5FA;}
+.tab-btn{padding:8px 20px;border-radius:9999px;font-size:14px;font-weight:500;transition:all .2s cubic-bezier(.2,.8,.2,1);}
+.tab-btn.active{background:var(--t-accent);color:#fff;}
+.tab-btn:not(.active){color:var(--t-text2);}
+.tab-btn:not(.active):hover{background:var(--t-accent-hover);color:var(--t-accent-text);}
 .pulse{animation:pulse 2s infinite;}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+/* Michelin tab active needs white text override */
+[data-theme="michelin"] .tab-btn.active{color:#FAF7F2;}
+/* Header, loading, login text colors */
+#loginScreen h1,#dashboard h1{color:var(--t-text);}
+#loginScreen p,#loadingScreen p{color:var(--t-text2);}
+#loginError{color:var(--t-red);}
+/* Theme toggle button */
+.theme-toggle{width:36px;height:36px;border-radius:8px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s;}
+.theme-toggle:hover{background:var(--t-bg3);}
+.theme-toggle svg{width:20px;height:20px;color:var(--t-text2);}
+#activityList>div+div{border-top:1px solid var(--t-border);}
+/* Michelin: Fraunces display font for key headings */
+[data-theme="michelin"] h1,[data-theme="michelin"] h2{font-family:'Fraunces','Noto Serif TC',serif;}
+/* Empty states */
+#usersEmpty,#familiesEmpty,#activityEmpty{color:var(--t-text3);}
+/* Loading screen */
+#loadingScreen p{color:var(--t-text2);}
 </style>
 </head>
-<body class="bg-dark-900 text-white min-h-screen">
+<body class="min-h-screen">
 
 <!-- ═══ Login Screen ═══ -->
 <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4">
   <div class="card p-8 w-full max-w-sm text-center fade">
     <img src="island-logo.png" alt="AdventureKids" style="width:80px;height:80px;" class="mb-3 mx-auto">
     <h1 class="text-xl font-bold mb-1">AdventureKids 管理員</h1>
-    <p class="text-gray-400 text-sm mb-6">僅限授權管理員登入</p>
-    <button onclick="adminLogin()" class="w-full bg-white hover:bg-gray-100 text-gray-800 rounded-lg py-3 px-4 transition-colors flex items-center justify-center space-x-3 border border-gray-300">
+    <p class="text-sm mb-6" style="color:var(--t-text2)">僅限授權管理員登入</p>
+    <button onclick="adminLogin()" class="w-full rounded-lg py-3 px-4 transition-colors flex items-center justify-center space-x-3" style="background:var(--t-login-btn-bg);color:var(--t-login-btn-text);border:1px solid var(--t-login-btn-border)">
       <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
       <span class="font-medium">使用 Google 帳號登入</span>
     </button>
@@ -61,29 +123,32 @@ tailwind.config={theme:{extend:{
 <div id="loadingScreen" class="min-h-screen flex items-center justify-center hidden">
   <div class="text-center">
     <img src="island-logo.png" alt="AdventureKids" style="width:80px;height:80px;" class="mb-3 mx-auto pulse">
-    <p class="text-gray-400 text-sm">載入管理資料中...</p>
+    <p class="text-sm" style="color:var(--t-text2)">載入管理資料中...</p>
   </div>
 </div>
 
 <!-- ═══ Main Dashboard ═══ -->
 <div id="dashboard" class="hidden">
   <!-- Top Bar -->
-  <header class="sticky top-0 z-50 bg-dark-900/90 backdrop-blur-md border-b border-dark-700">
+  <header class="sticky top-0 z-50 backdrop-blur-md" style="background:var(--t-header-bg);border-bottom:1px solid var(--t-border);">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
       <div class="flex items-center space-x-3">
         <img src="island-logo.png" alt="AdventureKids" style="width:32px;height:32px;">
         <div>
-          <h1 class="font-bold text-lg leading-tight">AdventureKids 管理員</h1>
-          <p class="text-xs text-gray-500" id="adminEmail"></p>
+          <h1 class="font-bold text-lg leading-tight" style="font-family:var(--t-font-display)">AdventureKids 管理員</h1>
+          <p class="text-xs" style="color:var(--t-text3)" id="adminEmail"></p>
         </div>
-        <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-400 ml-2">👑 管理員</span>
+        <span class="text-[10px] font-bold px-2.5 py-1 rounded-full ml-2" style="background:var(--t-badge-admin-bg);color:var(--t-badge-admin-text)">管理員</span>
       </div>
-      <div class="flex items-center space-x-3">
-        <button onclick="refreshAll()" class="p-2 rounded-lg hover:bg-dark-700 transition-colors" title="重新整理">
-          <i class="ph ph-arrows-clockwise text-xl text-gray-400"></i>
+      <div class="flex items-center space-x-2">
+        <button onclick="toggleTheme()" class="theme-toggle" title="切換主題" id="themeToggleBtn">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" id="themeIcon"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z"/></svg>
         </button>
-        <button onclick="adminLogout()" class="p-2 rounded-lg hover:bg-dark-700 transition-colors" title="👑 登出管理員">
-          <i class="ph ph-sign-out text-xl text-gray-400"></i>
+        <button onclick="refreshAll()" class="theme-toggle" title="重新整理">
+          <i class="ph ph-arrows-clockwise text-xl" style="color:var(--t-text2)"></i>
+        </button>
+        <button onclick="adminLogout()" class="theme-toggle" title="登出管理員">
+          <i class="ph ph-sign-out text-xl" style="color:var(--t-text2)"></i>
         </button>
       </div>
     </div>
@@ -93,7 +158,7 @@ tailwind.config={theme:{extend:{
 
     <!-- ═══ Stats Overview ═══ -->
     <section class="fade">
-      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">總覽</h2>
+      <h2 class="text-sm font-semibold uppercase tracking-wider mb-3" style="color:var(--t-text3)">總覽</h2>
       <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3" id="statsGrid">
         <!-- filled by JS -->
       </div>
@@ -115,12 +180,12 @@ tailwind.config={theme:{extend:{
     <!-- ═══ Tab: Users ═══ -->
     <section id="tab-users" class="fade">
       <div class="flex flex-wrap gap-2 mb-4">
-        <select id="filterLoginType" onchange="renderUsers()" class="bg-dark-700 border border-dark-600 text-sm rounded-lg px-3 py-2 text-gray-300">
+        <select id="filterLoginType" onchange="renderUsers()" class="text-sm rounded-lg px-3 py-2" style="background:var(--t-select-bg);border:1px solid var(--t-select-border);color:var(--t-select-text)">
           <option value="all">全部登入方式</option>
           <option value="line">LINE 用戶</option>
           <option value="google">Google 用戶</option>
         </select>
-        <select id="filterRole" onchange="renderUsers()" class="bg-dark-700 border border-dark-600 text-sm rounded-lg px-3 py-2 text-gray-300">
+        <select id="filterRole" onchange="renderUsers()" class="text-sm rounded-lg px-3 py-2" style="background:var(--t-select-bg);border:1px solid var(--t-select-border);color:var(--t-select-text)">
           <option value="all">全部角色</option>
           <option value="captain">船長</option>
           <option value="kid">小冒險家</option>
@@ -130,7 +195,7 @@ tailwind.config={theme:{extend:{
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
-              <tr class="text-left text-gray-500 text-xs uppercase tracking-wider border-b border-dark-700">
+              <tr class="text-left text-xs uppercase tracking-wider" style="color:var(--t-text3);border-bottom:1px solid var(--t-border)">
                 <th class="px-4 py-3">用戶</th>
                 <th class="px-4 py-3">角色</th>
                 <th class="px-4 py-3">登入方式</th>
@@ -155,7 +220,7 @@ tailwind.config={theme:{extend:{
 
     <!-- ═══ Tab: Activity ═══ -->
     <section id="tab-activity" class="hidden fade">
-      <div class="card divide-y divide-dark-700" id="activityList"></div>
+      <div class="card" style="--divide-color:var(--t-border)" id="activityList"></div>
       <div id="activityEmpty" class="hidden text-center py-10 text-gray-500">尚無活動紀錄</div>
     </section>
 
@@ -405,21 +470,21 @@ function renderStats() {
   }).length;
 
   const stats = [
-    { label: '總用戶數', value: totalUsers, icon: 'ph-users', color: 'text-accent-blue' },
-    { label: 'LINE 用戶', value: lineUsers, icon: 'ph-chat-circle', color: 'text-accent-green' },
-    { label: 'Google 用戶', value: googleUsers, icon: 'ph-google-logo', color: 'text-accent-red' },
-    { label: '總家庭數', value: totalFamilies, icon: 'ph-house', color: 'text-accent-purple' },
-    { label: '今日活躍', value: activeToday, icon: 'ph-lightning', color: 'text-accent-gold' },
-    { label: '本週新用戶', value: newThisWeek, icon: 'ph-user-plus', color: 'text-accent-indigo' }
+    { label: '總用戶數', value: totalUsers, icon: 'ph-users', cv: '--t-accent' },
+    { label: 'LINE 用戶', value: lineUsers, icon: 'ph-chat-circle', cv: '--t-green' },
+    { label: 'Google 用戶', value: googleUsers, icon: 'ph-google-logo', cv: '--t-red' },
+    { label: '總家庭數', value: totalFamilies, icon: 'ph-house', cv: '--t-purple' },
+    { label: '今日活躍', value: activeToday, icon: 'ph-lightning', cv: '--t-gold' },
+    { label: '本週新用戶', value: newThisWeek, icon: 'ph-user-plus', cv: '--t-indigo' }
   ];
 
   document.getElementById('statsGrid').innerHTML = stats.map(s => `
     <div class="stat-card p-4">
       <div class="flex items-center justify-between mb-2">
-        <i class="ph ${s.icon} text-xl ${s.color}"></i>
+        <i class="ph ${s.icon} text-xl" style="color:var(${s.cv})"></i>
       </div>
-      <div class="text-2xl font-bold">${s.value}</div>
-      <div class="text-xs text-gray-500 mt-1">${s.label}</div>
+      <div class="text-2xl" style="font-family:var(--t-font-display);font-weight:500;color:var(--t-text)">${s.value}</div>
+      <div class="text-xs mt-1" style="color:var(--t-text3)">${s.label}</div>
     </div>
   `).join('');
 }
@@ -458,25 +523,25 @@ function renderUsers() {
   tbody.innerHTML = filtered.map(u => {
     const loginType = isGoogle(u.id);
     const loginBadge = loginType
-      ? '<span class="badge bg-red-500/20 text-red-400">Google</span>'
-      : '<span class="badge bg-green-500/20 text-green-400">LINE</span>';
+      ? `<span class="badge" style="background:var(--t-badge-red-bg);color:var(--t-badge-red-text)">Google</span>`
+      : `<span class="badge" style="background:var(--t-badge-green-bg);color:var(--t-badge-green-text)">LINE</span>`;
     const roleBadge = u.role === 'captain'
-      ? '<span class="badge bg-blue-500/20 text-blue-400">🚢 船長</span>'
-      : '<span class="badge bg-purple-500/20 text-purple-400">🧒 小冒險家</span>';
+      ? `<span class="badge" style="background:var(--t-badge-blue-bg);color:var(--t-badge-blue-text)">船長</span>`
+      : `<span class="badge" style="background:var(--t-badge-purple-bg);color:var(--t-badge-purple-text)">小冒險家</span>`;
     const familyName = u.familyId ? (familyNames[u.familyId] || u.familyId) : '-';
     const lastActive = u.lastActiveAt ? formatTime(toDate(u.lastActiveAt)) : '-';
 
-    return `<tr class="table-row border-b border-dark-700/50">
+    return `<tr class="table-row" style="border-bottom:1px solid var(--t-border)">
       <td class="px-4 py-3">
-        <div class="font-medium">${esc(u.name || '未命名')}</div>
-        <div class="text-xs text-gray-500 truncate max-w-[160px]">${esc(shortId(u.id))}</div>
+        <div class="font-medium" style="color:var(--t-text)">${esc(u.name || '未命名')}</div>
+        <div class="text-xs truncate max-w-[160px]" style="color:var(--t-text3)">${esc(shortId(u.id))}</div>
       </td>
       <td class="px-4 py-3">${roleBadge}</td>
       <td class="px-4 py-3">${loginBadge}</td>
-      <td class="px-4 py-3 text-gray-300 text-xs">${esc(familyName)}</td>
-      <td class="px-4 py-3 text-right font-mono text-accent-gold">${u.coins || 0}</td>
-      <td class="px-4 py-3 text-right font-mono text-accent-green">${u.petEXP || 0}</td>
-      <td class="px-4 py-3 text-xs text-gray-400">${lastActive}</td>
+      <td class="px-4 py-3 text-xs" style="color:var(--t-text2)">${esc(familyName)}</td>
+      <td class="px-4 py-3 text-right" style="font-family:var(--t-font-display);color:var(--t-gold)">${u.coins || 0}</td>
+      <td class="px-4 py-3 text-right" style="font-family:var(--t-font-display);color:var(--t-green)">${u.petEXP || 0}</td>
+      <td class="px-4 py-3 text-xs" style="color:var(--t-text3)">${lastActive}</td>
     </tr>`;
   }).join('');
 }
@@ -508,20 +573,20 @@ function renderFamilies() {
 
     const memberRows = (fam.members || []).map(mid => {
       const u = userMap[mid];
-      if (!u) return `<div class="text-xs text-gray-500 py-1">${esc(shortId(mid))}（資料不存在）</div>`;
+      if (!u) return `<div class="text-xs py-1" style="color:var(--t-text3)">${esc(shortId(mid))}（資料不存在）</div>`;
       const loginBadge = isGoogle(u.id)
-        ? '<span class="badge bg-red-500/20 text-red-400 text-[10px]">Google</span>'
-        : '<span class="badge bg-green-500/20 text-green-400 text-[10px]">LINE</span>';
+        ? `<span class="badge text-[10px]" style="background:var(--t-badge-red-bg);color:var(--t-badge-red-text)">Google</span>`
+        : `<span class="badge text-[10px]" style="background:var(--t-badge-green-bg);color:var(--t-badge-green-text)">LINE</span>`;
       const roleBadge = u.role === 'captain' ? '🚢' : '🧒';
       return `<div class="flex items-center justify-between py-1.5 text-sm">
         <div class="flex items-center space-x-2">
           <span>${roleBadge}</span>
-          <span class="text-gray-300">${esc(u.name || '未命名')}</span>
+          <span style="color:var(--t-text)">${esc(u.name || '未命名')}</span>
           ${loginBadge}
         </div>
-        <div class="flex items-center space-x-3 text-xs text-gray-500">
+        <div class="flex items-center space-x-3 text-xs" style="color:var(--t-text3)">
           <span>🐚 ${u.coins || 0}</span>
-          <span>⭐ ${u.petEXP || 0}</span>
+          <span>${u.petEXP || 0} EXP</span>
         </div>
       </div>`;
     }).join('');
@@ -530,22 +595,22 @@ function renderFamilies() {
       <div class="p-4 cursor-pointer flex items-center justify-between" onclick="toggleExpand(this)">
         <div class="flex-1 min-w-0">
           <div class="flex items-center space-x-2">
-            <span class="font-semibold">${esc(fam.name || '未命名家庭')}</span>
-            <span class="badge bg-dark-600 text-gray-400 text-[10px]">${esc(fam.inviteCode || '-')}</span>
+            <span class="font-semibold" style="font-family:var(--t-font-display);color:var(--t-text)">${esc(fam.name || '未命名家庭')}</span>
+            <span class="badge text-[10px]" style="background:var(--t-badge-mute-bg);color:var(--t-badge-mute-text)">${esc(fam.inviteCode || '-')}</span>
           </div>
-          <div class="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-500">
+          <div class="flex flex-wrap gap-3 mt-1.5 text-xs" style="color:var(--t-text3)">
             <span><i class="ph ph-users"></i> ${memberCount} 成員</span>
             <span><i class="ph ph-list-checks"></i> ${taskCount} 任務</span>
             <span><i class="ph ph-gift"></i> ${rewardCount} 獎勵</span>
             <span><i class="ph ph-clock"></i> ${created}</span>
           </div>
         </div>
-        <i class="ph ph-caret-down text-gray-500 text-lg transition-transform expand-arrow"></i>
+        <i class="ph ph-caret-down text-lg transition-transform expand-arrow" style="color:var(--t-text3)"></i>
       </div>
       <div class="expand-content">
-        <div class="px-4 pb-4 pt-1 border-t border-dark-700">
-          <div class="text-xs text-gray-500 mb-2 font-semibold">成員詳情</div>
-          ${memberRows || '<div class="text-xs text-gray-500">無成員</div>'}
+        <div class="px-4 pb-4 pt-1" style="border-top:1px solid var(--t-border)">
+          <div class="text-xs mb-2 font-semibold" style="color:var(--t-text3)">成員詳情</div>
+          ${memberRows || '<div class="text-xs" style="color:var(--t-text3)">無成員</div>'}
         </div>
       </div>
     </div>`;
@@ -578,10 +643,10 @@ function renderActivity() {
     return `<div class="flex items-center space-x-3 px-4 py-3">
       <span class="text-xl flex-shrink-0">${a.icon}</span>
       <div class="flex-1 min-w-0">
-        <div class="text-sm text-gray-200">${esc(a.text)}</div>
-        ${a.detail ? `<div class="text-xs text-gray-500">${esc(a.detail)}</div>` : ''}
+        <div class="text-sm" style="color:var(--t-text)">${esc(a.text)}</div>
+        ${a.detail ? `<div class="text-xs" style="color:var(--t-text3)">${esc(a.detail)}</div>` : ''}
       </div>
-      <div class="text-xs text-gray-600 flex-shrink-0">${timeStr}</div>
+      <div class="text-xs flex-shrink-0" style="color:var(--t-text3)">${timeStr}</div>
     </div>`;
   }).join('');
 }
@@ -652,6 +717,41 @@ function esc(s) {
   d.textContent = s;
   return d.innerHTML;
 }
+
+// ══════════════════════════════════════
+// Theme Toggle
+// ══════════════════════════════════════
+const SUN_SVG = '<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z"/>';
+const MOON_SVG = '<path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"/>';
+
+function initTheme(){
+  const saved = localStorage.getItem('admin_theme');
+  if(saved === 'michelin'){
+    document.documentElement.setAttribute('data-theme','michelin');
+  }
+  updateThemeIcon();
+}
+
+function toggleTheme(){
+  const current = document.documentElement.getAttribute('data-theme');
+  if(current === 'michelin'){
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('admin_theme','dark');
+  } else {
+    document.documentElement.setAttribute('data-theme','michelin');
+    localStorage.setItem('admin_theme','michelin');
+  }
+  updateThemeIcon();
+}
+
+function updateThemeIcon(){
+  const icon = document.getElementById('themeIcon');
+  if(!icon) return;
+  const isMichelin = document.documentElement.getAttribute('data-theme') === 'michelin';
+  icon.innerHTML = isMichelin ? MOON_SVG : SUN_SVG;
+}
+
+initTheme();
 
 // ══════════════════════════════════════
 // Init: check if already logged in
