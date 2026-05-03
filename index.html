@@ -22,18 +22,19 @@ tailwind.config={theme:{extend:{
 body{background:#13141C;color:#fff;margin:0;min-height:100dvh;transition:background .3s,color .3s;}
 .card-press{transition:all .15s cubic-bezier(.2,.8,.2,1);}
 .card-press:active{transform:scale(.97);}
-[data-theme="michelin"] body{background:#FAF7F2!important;color:#2A2520!important;}
-[data-theme="michelin"] body,[data-theme="michelin"] input,[data-theme="michelin"] select,[data-theme="michelin"] textarea,[data-theme="michelin"] button{font-family:'Plus Jakarta Sans','Noto Sans TC',sans-serif;}
-[data-theme="michelin"] h1{font-family:'Fraunces','Noto Serif TC',serif!important;}
-[data-theme="michelin"] .text-white{color:#2A2520!important;}
+[data-theme="michelin"] body{background:#FAF7F2!important;color:#2A2520!important;-webkit-font-smoothing:antialiased!important;}
+[data-theme="michelin"] body,[data-theme="michelin"] input,[data-theme="michelin"] select,[data-theme="michelin"] textarea,[data-theme="michelin"] button{font-family:'Plus Jakarta Sans','Noto Sans TC',sans-serif;letter-spacing:-.01em;}
+[data-theme="michelin"] h1{font-family:'Fraunces','Noto Serif TC',serif!important;letter-spacing:-.02em!important;}
+[data-theme="michelin"] .text-white{color:#1F1B16!important;}
 [data-theme="michelin"] .text-gray-400{color:#6B5F52!important;}
-[data-theme="michelin"] .text-gray-600{color:#9A8F82!important;}
-[data-theme="michelin"] .text-accent-blue{color:#8B6F47!important;}
-[data-theme="michelin"] .text-accent-gold{color:#C99566!important;}
-[data-theme="michelin"] .bg-accent-blue\/15{background:rgba(139,111,71,.12)!important;}
-[data-theme="michelin"] .bg-accent-gold\/15{background:rgba(201,149,102,.12)!important;}
-[data-theme="michelin"] a.card-press{background:rgba(139,111,71,.06)!important;border-color:rgba(139,111,71,.2)!important;}
-[data-theme="michelin"] a.card-press:last-of-type{background:rgba(201,149,102,.06)!important;border-color:rgba(201,149,102,.2)!important;}
+[data-theme="michelin"] .text-gray-600{color:#8C8176!important;}
+[data-theme="michelin"] .text-accent-blue{color:#7D6340!important;}
+[data-theme="michelin"] .text-accent-gold{color:#B8854A!important;}
+[data-theme="michelin"] .bg-accent-blue\/15{background:rgba(125,99,64,.1)!important;}
+[data-theme="michelin"] .bg-accent-gold\/15{background:rgba(201,149,102,.1)!important;}
+[data-theme="michelin"] a.card-press{background:rgba(125,99,64,.05)!important;border-color:rgba(125,99,64,.15)!important;box-shadow:0 1px 3px rgba(42,37,32,.04),0 4px 12px rgba(42,37,32,.03)!important;transition:all .2s ease!important;}
+[data-theme="michelin"] a.card-press:hover{box-shadow:0 2px 8px rgba(42,37,32,.06),0 8px 20px rgba(42,37,32,.05)!important;border-color:rgba(125,99,64,.2)!important;}
+[data-theme="michelin"] a.card-press:last-of-type{background:rgba(201,149,102,.05)!important;border-color:rgba(201,149,102,.15)!important;}
 </style>
 <script>(function(){var t=localStorage.getItem('app_theme');if(t==='michelin')document.documentElement.setAttribute('data-theme','michelin');})()</script>
 </head>
