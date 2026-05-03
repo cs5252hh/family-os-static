@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>AdventureKids 冒險島</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Serif+TC:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/@phosphor-icons/web"></script>
 <script src="https://static.line-scdn.net/liff/edge/2.1/liff.js"></script>
 <script>
@@ -19,10 +19,23 @@ tailwind.config={theme:{extend:{
 </script>
 <style>
 *{font-family:'Inter','Noto Sans TC',sans-serif;-webkit-tap-highlight-color:transparent;}
-body{background:#13141C;color:#fff;margin:0;min-height:100dvh;}
-.card-press{transition:all .15s ease;}
+body{background:#13141C;color:#fff;margin:0;min-height:100dvh;transition:background .3s,color .3s;}
+.card-press{transition:all .15s cubic-bezier(.2,.8,.2,1);}
 .card-press:active{transform:scale(.97);}
+[data-theme="michelin"] body{background:#FAF7F2!important;color:#2A2520!important;}
+[data-theme="michelin"] *{font-family:'Plus Jakarta Sans','Noto Sans TC',sans-serif;}
+[data-theme="michelin"] h1{font-family:'Fraunces','Noto Serif TC',serif!important;}
+[data-theme="michelin"] .text-white{color:#2A2520!important;}
+[data-theme="michelin"] .text-gray-400{color:#6B5F52!important;}
+[data-theme="michelin"] .text-gray-600{color:#9A8F82!important;}
+[data-theme="michelin"] .text-accent-blue{color:#8B6F47!important;}
+[data-theme="michelin"] .text-accent-gold{color:#C99566!important;}
+[data-theme="michelin"] .bg-accent-blue\/15{background:rgba(139,111,71,.12)!important;}
+[data-theme="michelin"] .bg-accent-gold\/15{background:rgba(201,149,102,.12)!important;}
+[data-theme="michelin"] a.card-press{background:rgba(139,111,71,.06)!important;border-color:rgba(139,111,71,.2)!important;}
+[data-theme="michelin"] a.card-press:last-of-type{background:rgba(201,149,102,.06)!important;border-color:rgba(201,149,102,.2)!important;}
 </style>
+<script>(function(){var t=localStorage.getItem('app_theme');if(t==='michelin')document.documentElement.setAttribute('data-theme','michelin');})()</script>
 </head>
 <body class="flex items-center justify-center min-h-screen px-4">
 

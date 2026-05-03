@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>AdventureKids 冒險島 - 小冒險家登入</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Serif+TC:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/@phosphor-icons/web"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -29,7 +29,30 @@ body{font-family:'Inter','Noto Sans TC',sans-serif;background:#13141C;color:#e5e
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 .float-anim{animation:float 3s ease-in-out infinite;}
 .gold-glow{box-shadow:0 0 15px rgba(245,158,11,0.15);}
+/* ══ Michelin Theme ══ */
+[data-theme="michelin"] body{background:#FAF7F2!important;color:#2A2520!important;}
+[data-theme="michelin"] *{font-family:'Plus Jakarta Sans','Noto Sans TC',sans-serif;}
+[data-theme="michelin"] h1,[data-theme="michelin"] h2,[data-theme="michelin"] .text-2xl,[data-theme="michelin"] .text-xl,[data-theme="michelin"] .text-lg{font-family:'Fraunces','Noto Serif TC',serif!important;}
+[data-theme="michelin"] .bg-dark-900{background:#FAF7F2!important;}
+[data-theme="michelin"] .bg-dark-800{background:#FFFFFF!important;}
+[data-theme="michelin"] .bg-dark-700{background:#F2EBE0!important;}
+[data-theme="michelin"] .bg-dark-600{background:#E8E0D4!important;}
+[data-theme="michelin"] .card{background:#FFFFFF!important;border-color:rgba(42,37,32,.12)!important;}
+[data-theme="michelin"] .text-white,[data-theme="michelin"] .text-gray-200{color:#2A2520!important;}
+[data-theme="michelin"] .text-gray-300,[data-theme="michelin"] .text-gray-400{color:#6B5F52!important;}
+[data-theme="michelin"] .text-gray-500,[data-theme="michelin"] .text-gray-600{color:#9A8F82!important;}
+[data-theme="michelin"] .border-dark-700{border-color:rgba(42,37,32,.12)!important;}
+[data-theme="michelin"] .border-dark-600{border-color:rgba(42,37,32,.15)!important;}
+[data-theme="michelin"] .text-accent-gold{color:#C99566!important;}
+[data-theme="michelin"] .text-accent-blue{color:#8B6F47!important;}
+[data-theme="michelin"] .text-accent-green{color:#6B7F5C!important;}
+[data-theme="michelin"] .text-red-400{color:#C97D6F!important;}
+[data-theme="michelin"] .bg-accent-gold{background:#C99566!important;}
+[data-theme="michelin"] input{background:#FFFFFF!important;border-color:rgba(42,37,32,.15)!important;color:#2A2520!important;}
+[data-theme="michelin"] input:focus{border-color:#8B6F47!important;}
+[data-theme="michelin"] .gold-glow{box-shadow:0 0 15px rgba(201,149,102,.15)!important;}
 </style>
+<script>(function(){var t=localStorage.getItem('app_theme');if(t==='michelin')document.documentElement.setAttribute('data-theme','michelin');})()</script>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
 
